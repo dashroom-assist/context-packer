@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; object-src 'none'">
+<title>Workbench · Context Packer</title>
+<style>
+:root{color-scheme:dark;--bg:#12161b;--panel:#1a2027;--field:#0e1318;--line:#35404c;--text:#e8edf3;--muted:#aab5c3;--accent:#e5b970;--green:#91d4a9;--red:#ffa1a1;--blue:#8bc5ee;--ignored:#77818e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1380px;margin:auto;padding:26px 24px 48px}header{display:flex;justify-content:space-between;align-items:center;gap:18px;border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:20px}.eyebrow{font:700 12px ui-monospace,monospace;letter-spacing:.14em;color:var(--accent)}h1{font-size:28px;line-height:1.2;margin:6px 0}h2{font-size:17px;margin:0 0 12px}h3{font-size:14px;margin:0 0 8px}.muted,small{color:var(--muted)}.badge{font:12px ui-monospace,monospace;color:var(--green);border:1px solid var(--line);border-radius:5px;padding:7px 10px;white-space:nowrap}.setup{display:grid;grid-template-columns:minmax(270px,.75fr) minmax(320px,1.25fr);gap:18px}.workspace{display:grid;grid-template-columns:minmax(340px,.95fr) minmax(360px,1.05fr);gap:18px;align-items:start;margin-top:18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:18px;min-width:0}.step{color:var(--accent);font:13px ui-monospace,monospace;margin-right:8px}.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.split{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}button{font:inherit;font-size:13px;background:#29313b;color:var(--text);border:1px solid #4a5665;border-radius:5px;padding:8px 12px;min-height:38px;cursor:pointer}button:hover:not(:disabled){background:#36414d}button.primary{background:var(--accent);border-color:var(--accent);color:#21190d;font-weight:700}button.primary:hover:not(:disabled){background:#f1c988}button:disabled{opacity:.38;cursor:not-allowed}button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}textarea,input[type=text],select{display:block;width:100%;background:var(--field);border:1px solid var(--line);border-radius:5px;padding:11px;color:#d7e1ec;font:12px/1.55 ui-monospace,Consolas,monospace}textarea{min-height:132px;resize:vertical;margin:8px 0 11px}#ignore-rules{min-height:112px}#preview{min-height:560px;margin:12px 0 0;white-space:pre;overflow:auto}#folder{display:block;margin:10px 0;padding:10px;background:var(--field);border-radius:5px;color:var(--muted);overflow-wrap:anywhere}.note{border-left:3px solid var(--accent);padding:8px 10px;background:#221f19;color:#d9d1c4;font-size:13px}.status{margin:0 0 18px;padding:11px 13px;border:1px solid var(--line);border-radius:6px;background:#171c22}.status[data-kind=success]{border-color:#416d50;color:var(--green)}.status[data-kind=error]{border-color:#7b4545;color:var(--red)}.status[data-kind=busy]{border-color:#486778;color:var(--blue)}details.settings{margin-top:12px;border-top:1px solid var(--line);padding-top:11px}details.settings>summary{cursor:pointer;color:var(--accent);font-weight:650}details.settings label,.filters-panel label{display:block;margin:11px 0 5px}details.preset-menu{border-top:0;border-bottom:1px solid var(--line);padding:11px 0}.preset-menu .row{margin-top:9px}.preset-grid .row{flex-wrap:nowrap}.preset-menu input[type=text],.preset-menu select{width:auto;flex:1 1 0;min-width:0}.preset-menu>.preset-block{border-bottom:1px solid var(--line);padding-bottom:13px}.preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:13px}.preset-grid .preset-block+.preset-block{border-left:1px solid var(--line);padding-left:14px}.tree-tools{position:sticky;top:0;z-index:2;background:var(--panel);padding-bottom:0;border-bottom:0}#tree{max-height:610px;overflow:auto;padding:10px 3px 2px}.tree-empty{color:var(--muted)}.tree-dir{margin-left:18px}.tree-dir>summary{list-style:none;display:flex;align-items:center;gap:7px;min-height:29px;cursor:pointer}.tree-dir>summary::-webkit-details-marker{display:none}.tree-dir>summary::before{content:'▸';color:var(--muted);width:12px}.tree-dir[open]>summary::before{content:'▾'}.tree-file{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;min-height:29px;margin-left:36px;padding:2px 5px;border-radius:4px}.tree-file:hover{background:#222a33}.tree-file code,.tree-dir code{font-size:12px;overflow-wrap:anywhere}.tree-file small{font-size:11px;white-space:nowrap}.tree-file[data-status=ignored]{opacity:.58}.tree-file[data-status=error]{color:var(--red)}.folder-line{display:flex;align-items:center;gap:7px;min-width:0}.counts{font:12px ui-monospace,monospace;color:var(--muted)}.legend{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:8px}.legend code{color:var(--text)}.preview-summary{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;padding:9px 11px;background:var(--field);border:1px solid var(--line);border-radius:5px;color:var(--blue);font:12px ui-monospace,Consolas,monospace}.preview-summary span+span::before{content:'·';margin-right:8px;color:var(--muted)}footer{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:22px;padding-top:16px;color:var(--muted);font-size:12px}@media(max-width:900px){main{padding:18px 14px}.setup,.workspace,.preset-grid{grid-template-columns:1fr}header{align-items:flex-start}.badge{display:none}#preview{min-height:420px}.tree-file{grid-template-columns:auto minmax(0,1fr)}.tree-file small{grid-column:2;white-space:normal}.preset-grid .preset-block+.preset-block{border-left:0;border-top:1px solid var(--line);padding-left:0;padding-top:13px}}
+</style>
+</head>
+<body>
+<main>
+<header><div><div class="eyebrow">WORKBENCH / TOOL</div><h1>Context Packer</h1><p class="muted">Ferramenta local de empacotamento de arquivos com seleção, filtros e prévia em TXT.</p></div><span class="badge">OFFLINE TOOL · v1.0</span></header>
+<div id="status" class="status" role="status" aria-live="polite" data-kind="info">Escolha uma pasta base. Nada será enviado ou alterado.</div>
+<div class="setup">
+<section class="panel"><h2><span class="step">01</span>Escolha a pasta base</h2><p class="muted">A ferramenta não altera os arquivos de origem; só grava configurações e presets em <code>.cpacker/</code>.</p><button id="choose" class="primary">Escolher pasta base</button><output id="folder">Nenhuma pasta autorizada</output><small id="support"></small></section>
+<section class="panel filters-panel"><h2><span class="step">02</span>Filtros de exclusão</h2><p class="muted">Carregados de <code>.cpacker/</code> na pasta base. Você pode aplicá-los temporariamente ou salvar ambos.</p><label for="ext-ignore">Extensões ignoradas — <code>config.json</code></label><input id="ext-ignore" type="text" value="" spellcheck="false"><label for="ignore-rules">Arquivos e pastas ignorados — <code>.cpignore</code></label><textarea id="ignore-rules" spellcheck="false"></textarea><div class="row"><button id="apply-filters" disabled>Aplicar filtros</button><button id="save-filters" class="primary" disabled>Salvar alterações</button></div></section>
+</div>
+<div class="workspace">
+<section class="panel"><div class="tree-tools"><div class="split"><h2><span class="step">03</span>Arquivos da raiz</h2><span id="counts" class="counts">0 arquivos</span></div><div class="row"><button id="all" disabled>Selecionar elegíveis</button><button id="none" disabled>Desmarcar todos</button><button id="expand" disabled>Expandir pastas</button><button id="collapse" disabled>Recolher</button></div><div class="legend"><span><code>[x]</code> incluído</span><span><code>[ ]</code> fora</span><span><code>[-]</code> ignorado</span><span><code>[!]</code> erro</span></div></div><details id="preset-menu" class="settings preset-menu"><summary>Presets</summary><div class="preset-block"><h3>Aplicar lista de arquivos</h3><p class="muted">Cole uma lista de caminhos para marcar os arquivos correspondentes na árvore.</p><textarea id="request" spellcheck="false" placeholder="Arquivos:&#10;&#10;README.md&#10;src/app.js&#10;docs/requirements.md 1.0"></textarea><div class="row"><button id="load" class="primary" disabled>Aplicar preset</button><button id="example">Usar exemplo</button><button id="clear-preset">Limpar preset</button></div></div><div class="preset-grid"><div class="preset-block"><h3>Carregar preset salvo</h3><div class="row"><select id="saved-presets" aria-label="Presets salvos" disabled><option value="">Nenhum preset salvo</option></select><button id="load-saved-preset" disabled>Carregar</button></div></div><div class="preset-block"><h3>Salvar itens marcados</h3><div class="row"><input id="preset-name" type="text" placeholder="Nome do preset" spellcheck="false"><button id="save-preset" disabled>Salvar</button></div></div></div></details><div id="tree"><p class="tree-empty">A estrutura aparecerá aqui após escolher a pasta.</p></div></section>
+<section class="panel"><div class="split"><h2><span class="step">04</span>Prévia do TXT</h2><div class="row"><button id="copy" disabled>Copiar</button><button id="generate" class="primary" disabled>Salvar TXT</button></div></div><p class="muted">Atualizada quando a seleção ou os filtros mudam. A estrutura ASCII lista tudo que foi descoberto.</p><div id="preview-summary" class="preview-summary"><span>0 arquivos</span><span>0 KB</span><span>0 tokens estimados</span></div><textarea id="preview" readonly spellcheck="false" aria-label="Prévia do pacote TXT">Selecione pelo menos um arquivo elegível.</textarea></section>
+</div>
+<footer><span>HTML + CSS + JavaScript · File System Access API</span><span><code>file://</code> · Edge / Chrome</span></footer>
+</main>
+<script id="context-packer-core">
+'use strict';
+(() => {
+  const encoder = new TextEncoder();
+  const VERSION = '0.2.0';
+  const VERSION_SUFFIX = /^(.*\.(?:html?|css|m?js|cjs|json|md|txt|svg|csv|xml|ya?ml|toml))\s+(v?\d+(?:\.\d+)*(?:[-+][\w.-]+)?)$/i;
+  const builtInProtected = path => path.split('/').some(part => /^\.env(?:\.|$)/i.test(part) || ['.git','node_modules','.patcher-backups','.cpacker'].includes(part.toLowerCase()));
+  function safePath(value) {
+    const path = String(value || '').trim().replace(/\\/g, '/');
+    const parts = path.split('/');
+    if (!path || path.startsWith('/') || /^[a-z]:\//i.test(path) || parts.some(part => !part || part === '.' || part === '..' || /[\u0000-\u001f\u007f]/.test(part))) throw new Error('Caminho relativo inválido: ' + value);
+    if (builtInProtected(path)) throw new Error('Caminho protegido por padrão: ' + path);
+    return path;
+  }
+  function parseRequest(input) {
+    const rows = String(input || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const output = [], seen = new Set();
+    for (let row of rows) {
+      if (/^(anexos?|arquivos?|kit|lista)(?:\s+exatos?)?(?:\s+para.*)?\s*:?$/i.test(row)) continue;
+      if (/^[-*]\s+/.test(row)) row = row.replace(/^[-*]\s+/, '').trim();
+      let exact = row, path = row, annotation = '';
+      const suffix = row.match(VERSION_SUFFIX);
+      if (suffix) { path = suffix[1]; annotation = suffix[2]; }
+      path = safePath(path); exact = safePath(exact);
+      const key = path.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key); output.push({ requested:row, candidates:exact===path?[path]:[exact,path], annotation });
+    }
+    if (!output.length) throw new Error('Nenhum caminho de arquivo encontrado na lista.');
+    if (output.length > 200) throw new Error('A lista excede o limite de 200 arquivos.');
+    return output;
+  }
+  function globRegex(pattern) {
+    let source='', index=0;
+    while (index < pattern.length) {
+      const char=pattern[index];
+      if (char==='*' && pattern[index+1]==='*') { source+='.*'; index+=2; continue; }
+      if (char==='*') source+='[^/]*';
+      else if (char==='?') source+='[^/]';
+      else source+=char.replace(/[|\\{}()[\]^$+?.]/g,'\\$&');
+      index++;
+    }
+    return source;
+  }
+  function parseExtensionConfig(text) {
+    let parsed;try{parsed=JSON.parse(String(text||''));}catch{throw new Error('.cpacker/config.json contém JSON inválido.');}
+    if(!parsed||!Array.isArray(parsed.ignoredExtensions))throw new Error('.cpacker/config.json deve conter ignoredExtensions como lista.');
+    const output=[],seen=new Set();for(const value of parsed.ignoredExtensions){if(typeof value!=='string')throw new Error('ignoredExtensions deve conter somente textos.');const extension=(value.trim().startsWith('.')?value.trim():'.'+value.trim()).toLowerCase();if(!/^\.[a-z0-9][a-z0-9._+-]*$/.test(extension))throw new Error('Extensão ignorada inválida: '+value);if(!seen.has(extension)){seen.add(extension);output.push(extension);}}return output;
+  }
+  function normalizeExtensionList(text) {
+    const values=String(text||'').split(/[\s,;]+/).filter(Boolean);
+    return parseExtensionConfig(JSON.stringify({ignoredExtensions:values}));
+  }
+  function createIgnoreMatcher(extensionText, ruleText) {
+    const extensions=String(extensionText||'').split(/[\s,;]+/).map(item=>item.trim().toLowerCase()).filter(Boolean).map(item=>item.startsWith('.')?item:'.'+item);
+    const rules=String(ruleText||'').split(/\r?\n/).map(item=>item.trim()).filter(item=>item&&!item.startsWith('#')).map(raw=>{
+      const negate=raw.startsWith('!'), value=(negate?raw.slice(1):raw).replace(/\\/g,'/').replace(/^\//,'');
+      const directory=value.endsWith('/'), clean=directory?value.slice(0,-1):value, slash=clean.includes('/');
+      const source=globRegex(clean);
+      const regex=directory?new RegExp(`(?:^|/)${source}(?:/|$)`):slash?new RegExp(`^${source}$`):new RegExp(`(?:^|/)${source}$`);
+      return {raw,negate,regex};
+    });
+    return path => {
+      const normalized=String(path||'').replace(/\\/g,'/');
+      if (builtInProtected(normalized)) return 'protegido por padrão';
+      const lower=normalized.toLowerCase();
+      const extension=extensions.find(ext=>lower.endsWith(ext));
+      if (extension) return 'extensão '+extension;
+      let reason='';
+      for (const rule of rules) if (rule.regex.test(normalized)) reason=rule.negate?'':'regra '+rule.raw;
+      return reason;
+    };
+  }
+  function buildAsciiTree(rootName, entries) {
+    const root={dirs:new Map(),files:[]};
+    for (const entry of entries||[]) {
+      const parts=entry.path.replace(/\/$/,'').split('/'); let node=root;
+      parts.forEach((part,index)=>{
+        const last=index===parts.length-1;
+        if (last && !entry.isDirectory) node.files.push({...entry,name:part});
+        else { if(!node.dirs.has(part)) node.dirs.set(part,{dirs:new Map(),files:[],marker:last?entry:null}); node=node.dirs.get(part); }
+      });
+    }
+    const icon=status=>({included:'[x]',ignored:'[-]',error:'[!]',excluded:'[ ]'}[status]||'[ ]');
+    const lines=[`${rootName||'pasta-base'}/`];
+    function draw(node,prefix) {
+      const children=[...Array.from(node.dirs.entries()).sort((a,b)=>a[0].localeCompare(b[0])).map(([name,value])=>({kind:'dir',name,value})),...node.files.sort((a,b)=>a.name.localeCompare(b.name)).map(value=>({kind:'file',name:value.name,value}))];
+      children.forEach((child,index)=>{
+        const last=index===children.length-1, branch=last?'└── ':'├── ';
+        if(child.kind==='dir') { const marker=child.value.marker?icon(child.value.marker.status)+' ':''; lines.push(prefix+branch+marker+child.name+'/'); draw(child.value,prefix+(last?'    ':'│   ')); }
+        else lines.push(prefix+branch+icon(child.value.status)+' '+child.name);
+      });
+    }
+    draw(root,''); return lines.join('\n');
+  }
+  function summarizeSelection(files) {
+    const bytes=(files||[]).reduce((sum,file)=>sum+encoder.encode(String(file.content||'')).byteLength,0);
+    const characters=(files||[]).reduce((sum,file)=>sum+String(file.content||'').length,0);
+    return {files:(files||[]).length,bytes,kilobytes:Number((bytes/1024).toFixed(2)),estimatedTokens:Math.ceil(characters/4)};
+  }
+  function normalizePresetName(value) {
+    const raw=String(value||'').trim().replace(/\.json$/i,'');
+    if(!raw||/[\\/]/.test(raw)||raw==='.'||raw==='..')throw new Error('Nome de preset inválido.');
+    const slug=raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^[._-]+|[._-]+$/g,'');
+    if(!slug)throw new Error('Nome de preset inválido.');
+    return slug+'.json';
+  }
+  function buildPresetDocument(name,files) {
+    const cleanName=String(name||'').trim();normalizePresetName(cleanName);
+    const cleanFiles=(files||[]).map(file=>({path:safePath(file.path),annotation:String(file.annotation||'')}));
+    if(!cleanFiles.length)throw new Error('Selecione pelo menos um arquivo para salvar o preset.');
+    return JSON.stringify({formatVersion:'1.0',name:cleanName,files:cleanFiles},null,2)+'\n';
+  }
+  function parsePresetDocument(text) {
+    let parsed;try{parsed=JSON.parse(String(text||''));}catch{throw new Error('JSON de preset inválido.');}
+    if(!parsed||!Array.isArray(parsed.files)||!parsed.files.length||parsed.files.length>2000)throw new Error('JSON de preset inválido: lista de arquivos ausente ou fora do limite.');
+    const files=parsed.files.map(file=>{const item=typeof file==='string'?{path:file}:file;if(!item||typeof item.path!=='string')throw new Error('JSON de preset inválido.');return {path:safePath(item.path),annotation:String(item.annotation||'')};});
+    return {name:String(parsed.name||'Preset salvo'),files};
+  }
+  const quote=value=>JSON.stringify(String(value));
+  function chooseBoundary(values) { for(let n=0;n<10000;n++){const token='WB'+String(n).padStart(6,'0');if(values.every(value=>!String(value).includes(token)))return token;}throw new Error('Não foi possível criar delimitador sem colisão.'); }
+  function buildPackage({rootName,files=[],skipped=[],errors=[],inventory,generatedAt=new Date().toISOString()}) {
+    if(!files.length) throw new Error('Selecione pelo menos um arquivo válido.');
+    const rawInventory=inventory||[...files.map(file=>({path:file.path,status:'included',annotation:file.annotation||'',size:file.size})),...skipped.map(item=>({path:item.path,status:'excluded',reason:item.reason})),...errors.map(item=>({path:item.path,status:'error',reason:item.reason}))];
+    const effectiveInventory=rawInventory.filter(item=>!item.isDirectory||item.status==='ignored'||item.status==='error');
+    const ignored=effectiveInventory.filter(item=>item.status==='ignored');
+    const excluded=effectiveInventory.filter(item=>item.status==='excluded');
+    const errorItems=effectiveInventory.filter(item=>item.status==='error');
+    const values=[rootName,generatedAt,...files.flatMap(file=>[file.path,file.annotation||'',file.content]),...effectiveInventory.flatMap(item=>[item.path,item.reason||''])];
+    const boundary=chooseBoundary(values), snapshotId='wbctx-'+generatedAt.replace(/[^0-9]/g,'').slice(0,14);
+    const bodyBytes=files.map(file=>encoder.encode(file.content).byteLength), totalBodyBytes=bodyBytes.reduce((sum,size)=>sum+size,0);
+    const tree=buildAsciiTree(rootName,effectiveInventory);
+    const inventoryText=effectiveInventory.map(item=>`- rootId: "root"\n  path: ${quote(item.path)}\n  status: ${quote(item.status)}${item.annotation?`\n  annotation: ${quote(item.annotation)}`:''}${Number.isFinite(item.size)?`\n  size: ${item.size}`:''}${item.reason?`\n  reason: ${quote(item.reason)}`:''}`).join('\n');
+    const blocks=files.map((file,index)=>`WBCTX:${boundary}:BEGIN rootId="root" path=${quote(file.path)} encoding="utf-8" bodyBytes=${bodyBytes[index]}\n${file.content}\nWBCTX:${boundary}:END`).join('\n\n');
+    const skippedCount=excluded.length+ignored.length, hasGaps=skippedCount>0||errorItems.length>0;
+    return `WORKBENCH CONTEXT PACKAGE\nformatVersion: "${VERSION}"\nsnapshotId: ${quote(snapshotId)}\ngeneratedAt: ${quote(generatedAt)}\nexporter: "Workbench Context Packer 1.0"\nrootId: "root"\nrootName: ${quote(rootName||'pasta-base')}\nscope: "selected-from-root"\nencoding: "utf-8"\nboundary: ${quote(boundary)}\nmaxFiles: 2000\nmaxFileBytes: 2097152\nmaxTotalBodyBytes: 20971520\nincluded: ${files.length}\nskipped: ${skippedCount}\nerrors: ${errorItems.length}\ntotalBodyBytes: ${totalBodyBytes}\n\nSTRUCTURE\n${tree}\n\nLEGEND\n[x] included\n[ ] not selected\n[-] ignored by filter\n[!] read error\n\nINVENTORY\n${inventoryText}\n\nCONTENTS\n${blocks}\n\nWBCTX:${boundary}:COMPLETE snapshotId=${quote(snapshotId)} included=${files.length} skipped=${skippedCount} errors=${errorItems.length} totalBodyBytes=${totalBodyBytes} hasGaps=${hasGaps}\n`;
+  }
+  globalThis.ContextPackerCore={parseRequest,safePath,parseExtensionConfig,normalizeExtensionList,createIgnoreMatcher,buildAsciiTree,summarizeSelection,normalizePresetName,buildPresetDocument,parsePresetDocument,buildPackage};
+})();
+</script>
+<script>
+'use strict';
+(() => {
+  const core=globalThis.ContextPackerCore,$=selector=>document.querySelector(selector),decoder=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true});
+  const MAX_FILE=2*1024*1024,MAX_TOTAL=20*1024*1024,MAX_DISCOVERED=2000;
+  const DEFAULT_EXTENSIONS=['.png','.jpg','.jpeg','.gif','.webp','.ico','.pdf','.zip','.gz','.7z','.exe','.dll','.map'];
+  const DEFAULT_IGNORE=`# Uma regra por linha; aceita *, ** e ?
+.git/
+node_modules/
+.patcher-backups/
+backups/
+patches/
+records/
+.env
+.env.*
+`;
+  let root=null,items=[],presetMissing=[],previewRevision=0;
+  const els={choose:$('#choose'),folder:$('#folder'),support:$('#support'),ext:$('#ext-ignore'),rules:$('#ignore-rules'),applyFilters:$('#apply-filters'),saveFilters:$('#save-filters'),request:$('#request'),load:$('#load'),example:$('#example'),clearPreset:$('#clear-preset'),presetName:$('#preset-name'),savePreset:$('#save-preset'),savedPresets:$('#saved-presets'),loadSavedPreset:$('#load-saved-preset'),status:$('#status'),tree:$('#tree'),counts:$('#counts'),all:$('#all'),none:$('#none'),expand:$('#expand'),collapse:$('#collapse'),previewSummary:$('#preview-summary'),preview:$('#preview'),copy:$('#copy'),generate:$('#generate')};
+  const status=(message,kind='info')=>{els.status.textContent=message;els.status.dataset.kind=kind;};
+  const selected=()=>items.filter(item=>item.kind==='file'&&item.selected&&!item.ignoreReason&&!item.error);
+  const eligible=()=>items.filter(item=>item.kind==='file'&&!item.ignoreReason&&!item.error);
+  function syncButtons(){const has=items.length>0,hasSelection=selected().length>0;els.load.disabled=!root||!els.request.value.trim();els.applyFilters.disabled=!root;els.saveFilters.disabled=!root;els.all.disabled=!has;els.none.disabled=!has;els.expand.disabled=!has;els.collapse.disabled=!has;els.copy.disabled=!hasSelection;els.generate.disabled=!hasSelection;els.savePreset.disabled=!root||!hasSelection||!els.presetName.value.trim();els.loadSavedPreset.disabled=!root||!els.savedPresets.value;}
+  async function readItem(item){
+    if(item.content!==undefined||item.error)return;
+    try{if(item.size>MAX_FILE)throw new Error('excede 2 MB');const file=await item.handle.getFile(),bytes=await file.arrayBuffer();item.size=file.size;item.content=decoder.decode(bytes);if(item.content.includes('\u0000'))throw new Error('parece ser binário');}
+    catch(error){item.selected=false;item.error=error.message||String(error);}
+  }
+  function inventory(){return items.filter(item=>item.path!=='.cpacker'&&!item.path.startsWith('.cpacker/')&&(item.kind==='file'||item.ignoreReason||item.error)).map(item=>({path:item.path+(item.kind==='directory'?'/':''),isDirectory:item.kind==='directory',status:item.error?'error':item.ignoreReason?'ignored':item.selected?'included':'excluded',annotation:item.annotation||'',size:item.kind==='file'?item.size:undefined,reason:item.error||item.ignoreReason||(item.selected?'':'não selecionado')})).concat(presetMissing.map(item=>({path:item.path,status:'error',reason:'pedido pelo preset, mas não encontrado'})));}
+  async function packageText(){
+    const chosen=selected();await Promise.all(chosen.map(readItem));
+    const valid=selected().filter(item=>item.content!==undefined),total=valid.reduce((sum,item)=>sum+new TextEncoder().encode(item.content).byteLength,0);
+    if(total>MAX_TOTAL)throw new Error('A seleção excede 20 MB. Desmarque alguns arquivos.');
+    return core.buildPackage({rootName:root.name,files:valid.map(item=>({path:item.path,size:item.size,annotation:item.annotation||'',content:item.content})),inventory:inventory()});
+  }
+  function updatePreviewSummary(){
+    const summary=core.summarizeSelection(selected().filter(item=>item.content!==undefined));
+    els.previewSummary.innerHTML=`<span>${summary.files} ${summary.files===1?'arquivo':'arquivos'}</span><span>${summary.kilobytes.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} KB</span><span>≈ ${summary.estimatedTokens.toLocaleString('pt-BR')} tokens estimados</span>`;
+  }
+  async function refreshPreview(){
+    const revision=++previewRevision;syncButtons();const chosen=selected();els.counts.textContent=`${chosen.length} selecionados · ${eligible().length} elegíveis · ${items.filter(item=>item.ignoreReason).length} ignorados`;
+    if(!chosen.length){updatePreviewSummary();els.preview.value=items.length?core.buildAsciiTree(root?.name||'pasta-base',inventory()):'Selecione pelo menos um arquivo elegível.';return;}
+    els.preview.value='Gerando prévia…';
+    try{const text=await packageText();if(revision===previewRevision){els.preview.value=text;updatePreviewSummary();}}
+    catch(error){if(revision===previewRevision){els.preview.value='Prévia indisponível: '+error.message;status(error.message,'error');}}
+    renderTreeStates();syncButtons();
+  }
+  function applyFilters(){
+    const matcher=core.createIgnoreMatcher(els.ext.value,els.rules.value);
+    items.forEach(item=>{item.ignoreReason=matcher(item.path+(item.kind==='directory'?'/':''));if(item.ignoreReason)item.selected=false;});
+    renderTree();refreshPreview();
+  }
+  async function discover(directory,prefix=''){
+    const entries=[];for await(const [name,handle] of directory.entries())entries.push([name,handle]);entries.sort((a,b)=>a[0].localeCompare(b[0]));
+    for(const [name,handle] of entries){
+      if(items.length>=MAX_DISCOVERED)throw new Error(`A raiz excede ${MAX_DISCOVERED} itens descobertos. Escolha uma pasta menor ou refine a ferramenta.`);
+      const path=prefix+name;
+      if(handle.kind==='directory'){
+        if(name.toLowerCase()==='.cpacker')continue;
+        const protectedDir=['.git','node_modules','.patcher-backups','.cpacker'].includes(name.toLowerCase());
+        items.push({kind:'directory',path,handle,selected:false,ignoreReason:protectedDir?'protegido por padrão':''});
+        if(!protectedDir)await discover(handle,path+'/');
+      }else{const file=await handle.getFile();items.push({kind:'file',path,handle,size:file.size,selected:false,content:undefined,error:'',annotation:''});}
+    }
+  }
+  function childrenOf(directoryPath){const prefix=directoryPath?directoryPath+'/':'';return items.filter(item=>item.kind==='file'&&item.path.startsWith(prefix));}
+  async function setSelection(targets,value){targets.forEach(item=>{if(!item.ignoreReason&&!item.error)item.selected=value;});renderTreeStates();await refreshPreview();}
+  function folderState(path){const children=childrenOf(path).filter(item=>!item.ignoreReason&&!item.error);return {checked:children.length>0&&children.every(item=>item.selected),indeterminate:children.some(item=>item.selected)&&!children.every(item=>item.selected),disabled:children.length===0};}
+  function buildTreeModel(){const rootNode={dirs:new Map(),files:[]};for(const item of items){const parts=item.path.split('/');let node=rootNode;parts.forEach((part,index)=>{const last=index===parts.length-1;if(last&&item.kind==='file')node.files.push(item);else{if(!node.dirs.has(part))node.dirs.set(part,{path:parts.slice(0,index+1).join('/'),dirs:new Map(),files:[],item:last?item:null});node=node.dirs.get(part);}});}return rootNode;}
+  function renderTree(){
+    els.tree.textContent='';const model=buildTreeModel();
+    function draw(node,parent){
+      for(const [name,dir] of Array.from(node.dirs.entries()).sort((a,b)=>a[0].localeCompare(b[0]))){
+        const details=document.createElement('details');details.className='tree-dir';details.open=true;details.dataset.path=dir.path;
+        const summary=document.createElement('summary'),line=document.createElement('span');line.className='folder-line';
+        const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.dataset.folder=dir.path;const state=folderState(dir.path);checkbox.checked=state.checked;checkbox.indeterminate=state.indeterminate;checkbox.disabled=state.disabled;
+        checkbox.addEventListener('click',event=>event.stopPropagation());checkbox.addEventListener('change',()=>setSelection(childrenOf(dir.path),checkbox.checked));
+        const code=document.createElement('code');code.textContent=name+'/';line.append(checkbox,code);summary.append(line);details.append(summary);draw(dir,details);parent.append(details);
+      }
+      for(const item of node.files.sort((a,b)=>a.path.localeCompare(b.path))){
+        const label=document.createElement('label');label.className='tree-file';label.dataset.path=item.path;label.dataset.status=item.error?'error':item.ignoreReason?'ignored':item.selected?'included':'excluded';
+        const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=item.selected;checkbox.disabled=!!item.ignoreReason||!!item.error;checkbox.addEventListener('change',()=>setSelection([item],checkbox.checked));
+        const code=document.createElement('code');code.textContent=item.path.split('/').pop();const meta=document.createElement('small');meta.textContent=item.error?'erro: '+item.error:item.ignoreReason?item.ignoreReason:item.size.toLocaleString('pt-BR')+' bytes';label.append(checkbox,code,meta);parent.append(label);
+      }
+    }
+    draw(model,els.tree);renderTreeStates();syncButtons();
+  }
+  function renderTreeStates(){
+    els.tree.querySelectorAll('.tree-file').forEach(label=>{const item=items.find(candidate=>candidate.path===label.dataset.path&&candidate.kind==='file');if(!item)return;const checkbox=label.querySelector('input');checkbox.checked=item.selected;checkbox.disabled=!!item.ignoreReason||!!item.error;label.dataset.status=item.error?'error':item.ignoreReason?'ignored':item.selected?'included':'excluded';label.querySelector('small').textContent=item.error?'erro: '+item.error:item.ignoreReason?item.ignoreReason:item.size.toLocaleString('pt-BR')+' bytes';});
+    els.tree.querySelectorAll('[data-folder]').forEach(checkbox=>{const state=folderState(checkbox.dataset.folder);checkbox.checked=state.checked;checkbox.indeterminate=state.indeterminate;checkbox.disabled=state.disabled;});
+  }
+  async function readOrCreateConfig(directory,name,initial){
+    let handle;try{handle=await directory.getFileHandle(name);}catch(error){if(error.name!=='NotFoundError')throw error;handle=await directory.getFileHandle(name,{create:true});const stream=await handle.createWritable();await stream.write(initial);await stream.close();}
+    const file=await handle.getFile();if(file.size>65536)throw new Error(`.cpacker/${name} excede 64 KB`);return decoder.decode(await file.arrayBuffer());
+  }
+  const withoutProtectedRule=text=>String(text||'').split(/\r?\n/).filter(line=>!['.cpacker','.cpacker/'].includes(line.trim())).join('\n').replace(/\n*$/,'\n');
+  async function writeAndVerify(directory,name,text){
+    const handle=await directory.getFileHandle(name,{create:true}),stream=await handle.createWritable();await stream.write(text);await stream.close();
+    const saved=await (await handle.getFile()).text();if(saved!==text)throw new Error(`Não foi possível confirmar a gravação de .cpacker/${name}.`);
+  }
+  async function loadIgnoreConfig(directory){
+    let text='',mustWrite=false,legacy=false;
+    try{const handle=await directory.getFileHandle('.cpignore'),file=await handle.getFile();if(file.size>65536)throw new Error('.cpacker/.cpignore excede 64 KB');text=decoder.decode(await file.arrayBuffer());}
+    catch(error){
+      if(error.name!=='NotFoundError')throw error;mustWrite=true;
+      try{const handle=await directory.getFileHandle('.contextpackerignore'),file=await handle.getFile();if(file.size>65536)throw new Error('.cpacker/.contextpackerignore excede 64 KB');text=decoder.decode(await file.arrayBuffer());legacy=true;}
+      catch(legacyError){if(legacyError.name!=='NotFoundError')throw legacyError;text=DEFAULT_IGNORE;}
+    }
+    const normalized=withoutProtectedRule(text);if(mustWrite||normalized!==text)await writeAndVerify(directory,'.cpignore',normalized);if(legacy)await directory.removeEntry('.contextpackerignore');
+    return normalized;
+  }
+  async function loadCpackerConfig(){
+    const directory=await root.getDirectoryHandle('.cpacker',{create:true});
+    await directory.getDirectoryHandle('presets',{create:true});
+    const configText=await readOrCreateConfig(directory,'config.json',JSON.stringify({ignoredExtensions:DEFAULT_EXTENSIONS},null,2)+'\n');
+    const ignoreText=await loadIgnoreConfig(directory);
+    els.ext.value=core.parseExtensionConfig(configText).join(', ');els.rules.value=ignoreText;
+  }
+  async function saveFilterConfig(){
+    try{
+      if(root.queryPermission&&await root.queryPermission({mode:'readwrite'})!=='granted'&&await root.requestPermission({mode:'readwrite'})!=='granted')throw new Error('Permissão de gravação não concedida.');
+      const extensions=core.normalizeExtensionList(els.ext.value),rules=withoutProtectedRule(els.rules.value),directory=await root.getDirectoryHandle('.cpacker',{create:true});
+      const config=JSON.stringify({ignoredExtensions:extensions},null,2)+'\n';await Promise.all([writeAndVerify(directory,'config.json',config),writeAndVerify(directory,'.cpignore',rules)]);
+      els.ext.value=extensions.join(', ');els.rules.value=rules;applyFilters();status('Alterações salvas em .cpacker/config.json e .cpacker/.cpignore.','success');
+    }catch(error){status('Não foi possível salvar os filtros: '+error.message,'error');}
+  }
+  async function chooseRoot(){
+    try{root=await showDirectoryPicker({mode:'readwrite'});items=[];presetMissing=[];els.folder.textContent=root.name;status('Preparando .cpacker/ e lendo a estrutura…','busy');await loadCpackerConfig();await discover(root);applyFilters();await refreshSavedPresets();status(`${items.filter(item=>item.kind==='file').length} arquivos encontrados. Configuração .cpacker carregada.`,'success');}
+    catch(error){if(error.name!=='AbortError')status('Não foi possível carregar a pasta: '+error.message,'error');}finally{syncButtons();}
+  }
+  async function applyPreset(){
+    try{const requests=core.parseRequest(els.request.value);items.filter(item=>item.kind==='file').forEach(item=>{item.selected=false;item.annotation='';});presetMissing=[];let matched=0;
+      for(const request of requests){const item=request.candidates.map(path=>items.find(candidate=>candidate.kind==='file'&&candidate.path===path)).find(Boolean);if(item&&!item.ignoreReason){item.selected=true;item.annotation=request.annotation;matched++;}else presetMissing.push({path:request.candidates[request.candidates.length-1]});}
+      renderTree();await refreshPreview();status(`${matched} itens do preset marcados${presetMissing.length?`; ${presetMissing.length} não encontrados ou ignorados`:''}.`,presetMissing.length?'error':'success');
+    }catch(error){status(error.message,'error');}
+  }
+  async function refreshSavedPresets(preferred=''){
+    const current=preferred||els.savedPresets.value;els.savedPresets.textContent='';
+    let directory=null;try{directory=await (await root.getDirectoryHandle('.cpacker')).getDirectoryHandle('presets');}catch(error){if(error.name!=='NotFoundError')throw error;}
+    const names=[];if(directory)for await(const [name,handle] of directory.entries())if(handle.kind==='file'&&name.toLowerCase().endsWith('.json'))names.push(name);
+    names.sort((a,b)=>a.localeCompare(b));const empty=document.createElement('option');empty.value='';empty.textContent=names.length?'Selecione um preset':'Nenhum preset salvo';els.savedPresets.append(empty);
+    names.forEach(name=>{const option=document.createElement('option');option.value=name;option.textContent=name;els.savedPresets.append(option);});els.savedPresets.disabled=!names.length;els.savedPresets.value=names.includes(current)?current:'';syncButtons();
+  }
+  async function savePreset(){
+    try{const filename=core.normalizePresetName(els.presetName.value),text=core.buildPresetDocument(els.presetName.value,selected());const cpacker=await root.getDirectoryHandle('.cpacker',{create:true}),directory=await cpacker.getDirectoryHandle('presets',{create:true}),handle=await directory.getFileHandle(filename,{create:true}),stream=await handle.createWritable();await stream.write(text);await stream.close();await refreshSavedPresets(filename);status(`Preset salvo em .cpacker/presets/${filename} com ${selected().length} arquivos.`,'success');}
+    catch(error){status('Não foi possível salvar o preset: '+error.message,'error');}
+  }
+  async function loadSavedPreset(){
+    try{const filename=els.savedPresets.value;if(!filename)return;const cpacker=await root.getDirectoryHandle('.cpacker'),directory=await cpacker.getDirectoryHandle('presets'),handle=await directory.getFileHandle(filename),file=await handle.getFile(),preset=core.parsePresetDocument(await file.text());els.request.value=preset.files.map(item=>item.path+(item.annotation?' '+item.annotation:'')).join('\n');syncButtons();await applyPreset();status(`Preset ${filename} carregado com ${preset.files.length} arquivos.`,'success');}
+    catch(error){status('Não foi possível carregar o preset: '+error.message,'error');}
+  }
+  els.choose.addEventListener('click',chooseRoot);els.request.addEventListener('input',syncButtons);els.presetName.addEventListener('input',syncButtons);els.savedPresets.addEventListener('change',syncButtons);els.savePreset.addEventListener('click',savePreset);els.loadSavedPreset.addEventListener('click',loadSavedPreset);els.applyFilters.addEventListener('click',applyFilters);els.saveFilters.addEventListener('click',saveFilterConfig);els.load.addEventListener('click',applyPreset);
+  els.example.addEventListener('click',()=>{els.request.value='Arquivos:\n\nREADME.md\nsrc/app.js\nsrc/utils.js\ndocs/requirements.md 1.0\ndocs/architecture.md\ntests/app.test.js';syncButtons();});
+  els.clearPreset.addEventListener('click',()=>{els.request.value='';presetMissing=[];syncButtons();refreshPreview();status('Preset limpo. A seleção manual foi mantida.');});
+  els.all.addEventListener('click',()=>setSelection(eligible(),true));els.none.addEventListener('click',()=>setSelection(items.filter(item=>item.kind==='file'),false));
+  els.expand.addEventListener('click',()=>els.tree.querySelectorAll('details').forEach(item=>item.open=true));els.collapse.addEventListener('click',()=>els.tree.querySelectorAll('details').forEach(item=>item.open=false));
+  els.copy.addEventListener('click',async()=>{try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(els.preview.value);else{els.preview.focus();els.preview.select();if(!document.execCommand('copy'))throw new Error('O navegador bloqueou a área de transferência.');}status('Prévia TXT copiada.','success');}catch(error){status('Não foi possível copiar: '+error.message,'error');}});
+  els.generate.addEventListener('click',async()=>{try{const output=await packageText(),name=`contexto-${root.name.replace(/[^a-z0-9._-]+/gi,'-')}-${new Date().toISOString().slice(0,10)}.txt`;if(typeof showSaveFilePicker==='function'){const handle=await showSaveFilePicker({suggestedName:name,types:[{description:'Arquivo de contexto TXT',accept:{'text/plain':['.txt']}}]});const stream=await handle.createWritable();await stream.write(output);await stream.close();}else{const url=URL.createObjectURL(new Blob([output],{type:'text/plain;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}status(`TXT salvo com ${selected().length} arquivos. As fontes não foram alteradas.`,'success');}catch(error){if(error.name!=='AbortError')status('Falha ao salvar: '+error.message,'error');}});
+  const supported=typeof showDirectoryPicker==='function';els.choose.disabled=!supported;els.support.textContent=supported?'File System Access API disponível.':'Abra o index.html por file:// no Edge ou Chrome.';if(!supported)status('File System Access API indisponível neste contexto.','error');syncButtons();
+  globalThis.ContextPackerBrowser={selected,inventory,refreshPreview,applyPreset};
+})();
+</script>
+</body>
+</html>

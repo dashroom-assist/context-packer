@@ -1,0 +1,9 @@
+# Presets podem revelar nomes e caminhos escolhidos pelo usuário
+.cpacker/presets/
+
+# Pacotes gerados localmente
+contexto-*.txt
+
+# Metadados do sistema operacional
+.DS_Store
+Thumbs.db

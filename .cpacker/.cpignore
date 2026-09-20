@@ -1,0 +1,9 @@
+# Uma regra por linha; aceita *, ** e ?
+.git/
+node_modules/
+.patcher-backups/
+backups/
+patches/
+records/
+.env
+.env.*
