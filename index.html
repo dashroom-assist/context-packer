@@ -20,7 +20,7 @@
 </div>
 <div class="workspace">
 <section class="panel"><div class="tree-tools"><div class="split"><h2><span class="step">03</span>Arquivos da raiz</h2><span id="counts" class="counts">0 arquivos</span></div><div class="row"><button id="all" disabled>Selecionar elegíveis</button><button id="none" disabled>Desmarcar todos</button><button id="expand" disabled>Expandir pastas</button><button id="collapse" disabled>Recolher</button></div><div class="legend"><span><code>[x]</code> incluído</span><span><code>[ ]</code> fora</span><span><code>[-]</code> ignorado</span><span><code>[!]</code> erro</span></div></div><details id="preset-menu" class="settings preset-menu"><summary>Presets</summary><div class="preset-block"><h3>Aplicar lista de arquivos</h3><p class="muted">Cole uma lista de caminhos para marcar os arquivos correspondentes na árvore.</p><textarea id="request" spellcheck="false" placeholder="Arquivos:&#10;&#10;README.md&#10;src/app.js&#10;docs/requirements.md 1.0"></textarea><div class="row"><button id="load" class="primary" disabled>Aplicar preset</button><button id="example">Usar exemplo</button><button id="clear-preset">Limpar preset</button></div></div><div class="preset-grid"><div class="preset-block"><h3>Carregar preset salvo</h3><div class="row"><select id="saved-presets" aria-label="Presets salvos" disabled><option value="">Nenhum preset salvo</option></select><button id="load-saved-preset" disabled>Carregar</button></div></div><div class="preset-block"><h3>Salvar itens marcados</h3><div class="row"><input id="preset-name" type="text" placeholder="Nome do preset" spellcheck="false"><button id="save-preset" disabled>Salvar</button></div></div></div></details><div id="tree"><p class="tree-empty">A estrutura aparecerá aqui após escolher a pasta.</p></div></section>
-<section class="panel"><div class="split"><h2><span class="step">04</span>Prévia do TXT</h2><div class="row"><button id="copy" disabled>Copiar</button><button id="generate" class="primary" disabled>Salvar TXT</button></div></div><p class="muted">Atualizada quando a seleção ou os filtros mudam. A estrutura ASCII lista tudo que foi descoberto.</p><div id="preview-summary" class="preview-summary"><span>0 arquivos</span><span>0 KB</span><span>0 tokens estimados</span></div><textarea id="preview" readonly spellcheck="false" aria-label="Prévia do pacote TXT">Selecione pelo menos um arquivo elegível.</textarea></section>
+<section class="panel"><div class="split"><h2><span class="step">04</span>Prévia do TXT</h2><div class="row"><button id="copy" disabled>Copiar</button><button id="generate" class="primary" disabled>Salvar TXT</button></div></div><p class="muted">Atualizada quando a seleção ou os filtros mudam.</p><label for="show-structure"><input id="show-structure" type="checkbox" checked> Estrutura no TXT: <output id="structure-mode">completa</output></label><div id="preview-summary" class="preview-summary"><span>0 arquivos</span><span>0 KB</span><span>0 tokens estimados</span></div><textarea id="preview" readonly spellcheck="false" aria-label="Prévia do pacote TXT">Selecione pelo menos um arquivo elegível.</textarea></section>
 </div>
 <footer><span>HTML + CSS + JavaScript · File System Access API</span><span><code>file://</code> · Edge / Chrome</span></footer>
 </main>
@@ -145,7 +145,7 @@
   }
   const quote=value=>JSON.stringify(String(value));
   function chooseBoundary(values) { for(let n=0;n<10000;n++){const token='WB'+String(n).padStart(6,'0');if(values.every(value=>!String(value).includes(token)))return token;}throw new Error('Não foi possível criar delimitador sem colisão.'); }
-  function buildPackage({rootName,files=[],skipped=[],errors=[],inventory,generatedAt=new Date().toISOString()}) {
+  function buildPackage({rootName,files=[],skipped=[],errors=[],inventory,structureMode='all',generatedAt=new Date().toISOString()}) {
     if(!files.length) throw new Error('Selecione pelo menos um arquivo válido.');
     const rawInventory=inventory||[...files.map(file=>({path:file.path,status:'included',annotation:file.annotation||'',size:file.size})),...skipped.map(item=>({path:item.path,status:'excluded',reason:item.reason})),...errors.map(item=>({path:item.path,status:'error',reason:item.reason}))];
     const effectiveInventory=rawInventory.filter(item=>!item.isDirectory||item.status==='ignored'||item.status==='error');
@@ -155,11 +155,13 @@
     const values=[rootName,generatedAt,...files.flatMap(file=>[file.path,file.annotation||'',file.content]),...effectiveInventory.flatMap(item=>[item.path,item.reason||''])];
     const boundary=chooseBoundary(values), snapshotId='wbctx-'+generatedAt.replace(/[^0-9]/g,'').slice(0,14);
     const bodyBytes=files.map(file=>encoder.encode(file.content).byteLength), totalBodyBytes=bodyBytes.reduce((sum,size)=>sum+size,0);
-    const tree=buildAsciiTree(rootName,effectiveInventory);
+    const structureInventory=structureMode==='selected'?effectiveInventory.filter(item=>item.status==='included'):effectiveInventory;
+    const tree=buildAsciiTree(rootName,structureInventory);
     const inventoryText=effectiveInventory.map(item=>`- rootId: "root"\n  path: ${quote(item.path)}\n  status: ${quote(item.status)}${item.annotation?`\n  annotation: ${quote(item.annotation)}`:''}${Number.isFinite(item.size)?`\n  size: ${item.size}`:''}${item.reason?`\n  reason: ${quote(item.reason)}`:''}`).join('\n');
     const blocks=files.map((file,index)=>`WBCTX:${boundary}:BEGIN rootId="root" path=${quote(file.path)} encoding="utf-8" bodyBytes=${bodyBytes[index]}\n${file.content}\nWBCTX:${boundary}:END`).join('\n\n');
     const skippedCount=excluded.length+ignored.length, hasGaps=skippedCount>0||errorItems.length>0;
-    return `WORKBENCH CONTEXT PACKAGE\nformatVersion: "${VERSION}"\nsnapshotId: ${quote(snapshotId)}\ngeneratedAt: ${quote(generatedAt)}\nexporter: "Workbench Context Packer 1.0"\nrootId: "root"\nrootName: ${quote(rootName||'pasta-base')}\nscope: "selected-from-root"\nencoding: "utf-8"\nboundary: ${quote(boundary)}\nmaxFiles: 2000\nmaxFileBytes: 2097152\nmaxTotalBodyBytes: 20971520\nincluded: ${files.length}\nskipped: ${skippedCount}\nerrors: ${errorItems.length}\ntotalBodyBytes: ${totalBodyBytes}\n\nSTRUCTURE\n${tree}\n\nLEGEND\n[x] included\n[ ] not selected\n[-] ignored by filter\n[!] read error\n\nINVENTORY\n${inventoryText}\n\nCONTENTS\n${blocks}\n\nWBCTX:${boundary}:COMPLETE snapshotId=${quote(snapshotId)} included=${files.length} skipped=${skippedCount} errors=${errorItems.length} totalBodyBytes=${totalBodyBytes} hasGaps=${hasGaps}\n`;
+    const structureSection=structureMode!=='none'?`\n\nSTRUCTURE\n${tree}\n\nLEGEND\n[x] included\n[ ] not selected\n[-] ignored by filter\n[!] read error`:'';
+    return `WORKBENCH CONTEXT PACKAGE\nformatVersion: "${VERSION}"\nsnapshotId: ${quote(snapshotId)}\ngeneratedAt: ${quote(generatedAt)}\nexporter: "Workbench Context Packer 1.0"\nrootId: "root"\nrootName: ${quote(rootName||'pasta-base')}\nscope: "selected-from-root"\nencoding: "utf-8"\nboundary: ${quote(boundary)}\nmaxFiles: 2000\nmaxFileBytes: 2097152\nmaxTotalBodyBytes: 20971520\nincluded: ${files.length}\nskipped: ${skippedCount}\nerrors: ${errorItems.length}\ntotalBodyBytes: ${totalBodyBytes}${structureSection}\n\nINVENTORY\n${inventoryText}\n\nCONTENTS\n${blocks}\n\nWBCTX:${boundary}:COMPLETE snapshotId=${quote(snapshotId)} included=${files.length} skipped=${skippedCount} errors=${errorItems.length} totalBodyBytes=${totalBodyBytes} hasGaps=${hasGaps}\n`;
   }
   globalThis.ContextPackerCore={parseRequest,safePath,parseExtensionConfig,normalizeExtensionList,createIgnoreMatcher,buildAsciiTree,summarizeSelection,normalizePresetName,buildPresetDocument,parsePresetDocument,buildPackage};
 })();
@@ -180,8 +182,8 @@ records/
 .env
 .env.*
 `;
-  let root=null,items=[],presetMissing=[],previewRevision=0;
-  const els={choose:$('#choose'),folder:$('#folder'),support:$('#support'),ext:$('#ext-ignore'),rules:$('#ignore-rules'),applyFilters:$('#apply-filters'),saveFilters:$('#save-filters'),request:$('#request'),load:$('#load'),example:$('#example'),clearPreset:$('#clear-preset'),presetName:$('#preset-name'),savePreset:$('#save-preset'),savedPresets:$('#saved-presets'),loadSavedPreset:$('#load-saved-preset'),status:$('#status'),tree:$('#tree'),counts:$('#counts'),all:$('#all'),none:$('#none'),expand:$('#expand'),collapse:$('#collapse'),previewSummary:$('#preview-summary'),preview:$('#preview'),copy:$('#copy'),generate:$('#generate')};
+  let root=null,items=[],presetMissing=[],previewRevision=0,structureMode='all';
+  const els={choose:$('#choose'),folder:$('#folder'),support:$('#support'),ext:$('#ext-ignore'),rules:$('#ignore-rules'),applyFilters:$('#apply-filters'),saveFilters:$('#save-filters'),request:$('#request'),load:$('#load'),example:$('#example'),clearPreset:$('#clear-preset'),presetName:$('#preset-name'),savePreset:$('#save-preset'),savedPresets:$('#saved-presets'),loadSavedPreset:$('#load-saved-preset'),status:$('#status'),tree:$('#tree'),counts:$('#counts'),all:$('#all'),none:$('#none'),expand:$('#expand'),collapse:$('#collapse'),showStructure:$('#show-structure'),structureMode:$('#structure-mode'),previewSummary:$('#preview-summary'),preview:$('#preview'),copy:$('#copy'),generate:$('#generate')};
   const status=(message,kind='info')=>{els.status.textContent=message;els.status.dataset.kind=kind;};
   const selected=()=>items.filter(item=>item.kind==='file'&&item.selected&&!item.ignoreReason&&!item.error);
   const eligible=()=>items.filter(item=>item.kind==='file'&&!item.ignoreReason&&!item.error);
@@ -196,7 +198,7 @@ records/
     const chosen=selected();await Promise.all(chosen.map(readItem));
     const valid=selected().filter(item=>item.content!==undefined),total=valid.reduce((sum,item)=>sum+new TextEncoder().encode(item.content).byteLength,0);
     if(total>MAX_TOTAL)throw new Error('A seleção excede 20 MB. Desmarque alguns arquivos.');
-    return core.buildPackage({rootName:root.name,files:valid.map(item=>({path:item.path,size:item.size,annotation:item.annotation||'',content:item.content})),inventory:inventory()});
+    return core.buildPackage({rootName:root.name,files:valid.map(item=>({path:item.path,size:item.size,annotation:item.annotation||'',content:item.content})),inventory:inventory(),structureMode});
   }
   function updatePreviewSummary(){
     const summary=core.summarizeSelection(selected().filter(item=>item.content!==undefined));
@@ -204,7 +206,7 @@ records/
   }
   async function refreshPreview(){
     const revision=++previewRevision;syncButtons();const chosen=selected();els.counts.textContent=`${chosen.length} selecionados · ${eligible().length} elegíveis · ${items.filter(item=>item.ignoreReason).length} ignorados`;
-    if(!chosen.length){updatePreviewSummary();els.preview.value=items.length?core.buildAsciiTree(root?.name||'pasta-base',inventory()):'Selecione pelo menos um arquivo elegível.';return;}
+    if(!chosen.length){updatePreviewSummary();els.preview.value=items.length&&structureMode==='all'?core.buildAsciiTree(root?.name||'pasta-base',inventory()):'Selecione pelo menos um arquivo elegível.';return;}
     els.preview.value='Gerando prévia…';
     try{const text=await packageText();if(revision===previewRevision){els.preview.value=text;updatePreviewSummary();}}
     catch(error){if(revision===previewRevision){els.preview.value='Prévia indisponível: '+error.message;status(error.message,'error');}}
@@ -319,7 +321,13 @@ records/
   els.clearPreset.addEventListener('click',()=>{els.request.value='';presetMissing=[];syncButtons();refreshPreview();status('Preset limpo. A seleção manual foi mantida.');});
   els.all.addEventListener('click',()=>setSelection(eligible(),true));els.none.addEventListener('click',()=>setSelection(items.filter(item=>item.kind==='file'),false));
   els.expand.addEventListener('click',()=>els.tree.querySelectorAll('details').forEach(item=>item.open=true));els.collapse.addEventListener('click',()=>els.tree.querySelectorAll('details').forEach(item=>item.open=false));
-  els.copy.addEventListener('click',async()=>{try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(els.preview.value);else{els.preview.focus();els.preview.select();if(!document.execCommand('copy'))throw new Error('O navegador bloqueou a área de transferência.');}status('Prévia TXT copiada.','success');}catch(error){status('Não foi possível copiar: '+error.message,'error');}});
+  function cycleStructureMode(){
+    structureMode={all:'none',none:'selected',selected:'all'}[structureMode];
+    els.showStructure.checked=structureMode==='all';els.showStructure.indeterminate=structureMode==='selected';els.showStructure.setAttribute('aria-checked',structureMode==='selected'?'mixed':String(els.showStructure.checked));
+    els.structureMode.textContent={all:'completa',selected:'somente selecionados',none:'nenhuma'}[structureMode];refreshPreview();
+  }
+  els.showStructure.addEventListener('change',cycleStructureMode);
+  els.copy.addEventListener('click',async()=>{try{const output=await packageText();els.preview.value=output;if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(output);else{els.preview.focus();els.preview.select();if(!document.execCommand('copy'))throw new Error('O navegador bloqueou a área de transferência.');}status('Prévia TXT copiada.','success');}catch(error){status('Não foi possível copiar: '+error.message,'error');}});
   els.generate.addEventListener('click',async()=>{try{const output=await packageText(),name=`contexto-${root.name.replace(/[^a-z0-9._-]+/gi,'-')}-${new Date().toISOString().slice(0,10)}.txt`;if(typeof showSaveFilePicker==='function'){const handle=await showSaveFilePicker({suggestedName:name,types:[{description:'Arquivo de contexto TXT',accept:{'text/plain':['.txt']}}]});const stream=await handle.createWritable();await stream.write(output);await stream.close();}else{const url=URL.createObjectURL(new Blob([output],{type:'text/plain;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}status(`TXT salvo com ${selected().length} arquivos. As fontes não foram alteradas.`,'success');}catch(error){if(error.name!=='AbortError')status('Falha ao salvar: '+error.message,'error');}});
   const supported=typeof showDirectoryPicker==='function';els.choose.disabled=!supported;els.support.textContent=supported?'File System Access API disponível.':'Abra o index.html por file:// no Edge ou Chrome.';if(!supported)status('File System Access API indisponível neste contexto.','error');syncButtons();
   globalThis.ContextPackerBrowser={selected,inventory,refreshPreview,applyPreset};

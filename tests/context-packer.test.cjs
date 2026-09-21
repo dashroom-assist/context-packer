@@ -77,7 +77,7 @@ const files = [
   { path: 'docs/a.md', annotation: '0.1.0', size: 5, content: 'Olá\n' },
   { path: 'src/b.js', annotation: '', size: 18, content: 'const x = "BEGIN";' }
 ];
-const pack = core.buildPackage({
+const packageInput = {
   rootName: 'projeto',
   files,
   skipped: [{ path: 'docs/opcional.md', reason: 'desmarcado pelo usuário' }],
@@ -91,7 +91,8 @@ const pack = core.buildPackage({
     { path: 'docs/ausente.md', status: 'error', reason: 'não encontrado' }
   ],
   generatedAt: '2026-09-20T12:00:00.000Z'
-});
+};
+const pack = core.buildPackage(packageInput);
 assert.match(pack, /formatVersion: "0.2.0"/);
 assert.match(pack, /exporter: "Workbench Context Packer 1.0"/);
 assert.match(pack, /included: 2/);
@@ -108,5 +109,16 @@ assert.ok(pack.includes('Olá\n'));
 assert.ok(pack.includes('const x = "BEGIN";'));
 assert.match(pack, /WBCTX:[A-Z0-9]+:COMPLETE/);
 assert.equal(new TextEncoder().encode(pack).byteLength > files.reduce((n, file) => n + file.size, 0), true);
+
+const packWithoutStructure = core.buildPackage({...packageInput, structureMode:'none'});
+assert.doesNotMatch(packWithoutStructure, /\nSTRUCTURE\n/);
+assert.doesNotMatch(packWithoutStructure, /\nLEGEND\n/);
+assert.match(packWithoutStructure, /\nINVENTORY\n/);
+
+const packWithSelectedStructure = core.buildPackage({...packageInput, structureMode:'selected'});
+const selectedStructure = packWithSelectedStructure.split('\nSTRUCTURE\n')[1].split('\n\nLEGEND\n')[0];
+assert.match(selectedStructure, /\[x\] a\.md/);
+assert.match(selectedStructure, /\[x\] b\.js/);
+assert.doesNotMatch(selectedStructure, /logo\.png|opcional\.md|ausente\.md/);
 
 console.log('context-packer core: ok');

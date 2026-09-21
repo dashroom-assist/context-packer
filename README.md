@@ -10,7 +10,7 @@ Ferramenta HTML local para selecionar arquivos de uma pasta e gerar um único pa
 4. No passo 3, marque arquivos ou pastas diretamente na árvore.
 5. Opcionalmente, abra **Presets** no passo 3 para colar uma lista de caminhos ou carregar um JSON salvo.
 6. Para reutilizar a seleção atual, ainda em **Presets**, informe um nome e clique em **Salvar**. O arquivo será criado em `.cpacker/presets/<nome>.json` dentro da pasta base.
-7. Confira a prévia TXT, atualizada conforme a seleção muda.
+7. Confira a prévia TXT, atualizada conforme a seleção muda. O checkbox de estrutura tem três estados: desmarcado não inclui árvore; `−` inclui somente os arquivos selecionados; `✓` inclui a estrutura completa descoberta.
 8. Use **Copiar** para enviar a prévia à área de transferência ou **Salvar TXT** para escolher o destino.
 9. Revise o TXT antes de compartilhá-lo ou processá-lo em outra ferramenta.
 
