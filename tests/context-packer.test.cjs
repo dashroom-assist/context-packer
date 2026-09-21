@@ -8,10 +8,32 @@ const html = fs.readFileSync(htmlPath, 'utf8');
 const match = html.match(/<script id="context-packer-core">([\s\S]*?)<\/script>/);
 assert.ok(match, 'Núcleo testável não encontrado.');
 
-const context = { globalThis: {}, TextEncoder };
+const context = { globalThis: {}, TextEncoder, TextDecoder };
 vm.runInNewContext(match[1], context);
 const core = context.globalThis.ContextPackerCore;
 assert.ok(core, 'API ContextPackerCore ausente.');
+
+function buildStoredZip(entries) {
+  const locals = [], centrals = []; let offset = 0;
+  for (const [name, content] of entries) {
+    const nameBytes = Buffer.from(name), data = Buffer.from(content);
+    const local = Buffer.alloc(30); local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt32LE(data.length, 18); local.writeUInt32LE(data.length, 22); local.writeUInt16LE(nameBytes.length, 26);
+    locals.push(local, nameBytes, data);
+    const central = Buffer.alloc(46); central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt32LE(data.length, 20); central.writeUInt32LE(data.length, 24); central.writeUInt16LE(nameBytes.length, 28); central.writeUInt32LE(offset, 42);
+    centrals.push(central, nameBytes); offset += local.length + nameBytes.length + data.length;
+  }
+  const centralDirectory = Buffer.concat(centrals), eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10); eocd.writeUInt32LE(centralDirectory.length, 12); eocd.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, centralDirectory, eocd]);
+}
+
+const zipIndex = core.parseZipArchive(buildStoredZip([['docs/', ''], ['docs/readme.md', '# ZIP\n'], ['src/app.js', 'zip();\n']]));
+assert.deepEqual(JSON.parse(JSON.stringify(zipIndex.map(({path,kind,size,method})=>({path,kind,size,method})))), [
+  {path:'docs', kind:'directory', size:0, method:0},
+  {path:'docs/readme.md', kind:'file', size:6, method:0},
+  {path:'src/app.js', kind:'file', size:7, method:0}
+]);
+assert.throws(()=>core.parseZipArchive(buildStoredZip([['../outside.txt', 'no']])), /caminho.*ZIP/i);
 
 const parsed = core.parseRequest(`Arquivos:\n\nREADME.md\nsrc/app.js 1.1\ndocs/requirements.md 1.0\n`);
 assert.deepEqual(JSON.parse(JSON.stringify(parsed)), [
@@ -79,6 +101,8 @@ const files = [
 ];
 const packageInput = {
   rootName: 'projeto',
+  sourceType: 'zip',
+  sourceName: 'projeto-snapshot.zip',
   files,
   skipped: [{ path: 'docs/opcional.md', reason: 'desmarcado pelo usuário' }],
   errors: [{ path: 'docs/ausente.md', reason: 'não encontrado' }],
@@ -95,6 +119,8 @@ const packageInput = {
 const pack = core.buildPackage(packageInput);
 assert.match(pack, /formatVersion: "0.2.0"/);
 assert.match(pack, /exporter: "Workbench Context Packer 1.0"/);
+assert.match(pack, /sourceType: "zip"/);
+assert.match(pack, /sourceName: "projeto-snapshot\.zip"/);
 assert.match(pack, /included: 2/);
 assert.match(pack, /skipped: 2/);
 assert.match(pack, /errors: 1/);

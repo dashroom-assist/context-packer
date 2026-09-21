@@ -4,8 +4,18 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { fileURLToPath } = require('node:url');
 const http = require('node:http');
+const { deflateRawSync } = require('node:zlib');
 const port = process.argv[2] || '9331';
 const url = process.argv[3];
+
+function buildZip(entries) {
+  const locals=[],centrals=[];let offset=0;
+  for(const [name,content,method=0] of entries){const nameBytes=Buffer.from(name),plain=Buffer.from(content),data=method===8?deflateRawSync(plain):plain;
+    const local=Buffer.alloc(30);local.writeUInt32LE(0x04034b50,0);local.writeUInt16LE(20,4);local.writeUInt16LE(method,8);local.writeUInt32LE(data.length,18);local.writeUInt32LE(plain.length,22);local.writeUInt16LE(nameBytes.length,26);locals.push(local,nameBytes,data);
+    const central=Buffer.alloc(46);central.writeUInt32LE(0x02014b50,0);central.writeUInt16LE(20,4);central.writeUInt16LE(20,6);central.writeUInt16LE(method,10);central.writeUInt32LE(data.length,20);central.writeUInt32LE(plain.length,24);central.writeUInt16LE(nameBytes.length,28);central.writeUInt32LE(offset,42);centrals.push(central,nameBytes);offset+=local.length+nameBytes.length+data.length;}
+  const directory=Buffer.concat(centrals),eocd=Buffer.alloc(22);eocd.writeUInt32LE(0x06054b50,0);eocd.writeUInt16LE(entries.length,8);eocd.writeUInt16LE(entries.length,10);eocd.writeUInt32LE(directory.length,12);eocd.writeUInt32LE(offset,16);return Buffer.concat([...locals,directory,eocd]);
+}
+const zipBase64=buildZip([['snapshot/docs/readme.md','# From ZIP\\n',8],['snapshot/src/app.js','export const zip = true;\\n'],['.cpacker/config.json','{}']]).toString('base64');
 
 (async () => {
   const target = await (await fetch(`http://127.0.0.1:${port}/json/new?${encodeURIComponent(url)}`, { method: 'PUT' })).json();
@@ -28,6 +38,7 @@ const url = process.argv[3];
     await evaluate(`new Promise(resolve => document.readyState === 'complete' ? resolve() : addEventListener('load', resolve, {once:true}))`);
     assert.equal(await evaluate(`typeof ContextPackerCore`), 'object');
     assert.equal(await evaluate(`typeof ContextPackerBrowser`), 'object');
+    assert.equal(await evaluate(`(async()=>{let pulls=0,cancelled=false;const stream=new ReadableStream({pull(controller){pulls++;controller.enqueue(new Uint8Array(1024));},cancel(){cancelled=true;}});try{await ContextPackerBrowser.readStreamLimited(stream,1500);}catch(error){return pulls<10&&cancelled&&/limite/i.test(error.message);}return false;})()`), true, 'descompactação deve parar assim que exceder o limite');
     assert.equal(await evaluate(`document.querySelector('#choose').disabled`), false);
     assert.equal(await evaluate(`document.querySelector('#preset-menu').open`), false);
     assert.equal(await evaluate(`!!(document.querySelector('#status').compareDocumentPosition(document.querySelector('.setup')) & Node.DOCUMENT_POSITION_FOLLOWING)`), true);
@@ -57,6 +68,7 @@ const url = process.argv[3];
       const description=document.querySelector('header .muted').textContent;
       if(!description.includes('empacotamento de arquivos')||/coordena[cç][aã]o/i.test(description)) throw new Error('descrição deve ser genérica');
       if(document.querySelector('.badge').textContent!=='OFFLINE TOOL · v1.0') throw new Error('selo da versão incorreto');
+      if(!document.querySelector('#choose-zip')||!document.querySelector('#source-drop')) throw new Error('passo 1 deve permitir selecionar ou arrastar ZIP');
       const copyButton=document.querySelector('#copy');
       if(!copyButton||copyButton.nextElementSibling?.id!=='generate') throw new Error('Copiar deve ficar à esquerda de Salvar TXT');
       const structureToggle=document.querySelector('#show-structure');
@@ -144,7 +156,33 @@ const url = process.argv[3];
       copied=''; document.querySelector('#copy').click(); await wait(()=>copied.includes('WBCTX:')&&copied.includes(':COMPLETE'));
       if(copied!==document.querySelector('#preview').value) throw new Error('Copiar não enviou a prévia completa');
       document.querySelector('#generate').click(); await wait(()=>saved.includes('WBCTX:') && saved.includes(':COMPLETE'));
-      return {discovered:document.querySelectorAll('.tree-file').length,selected:ContextPackerBrowser.selected().length,ignored:document.querySelectorAll('.tree-file[data-status="ignored"]').length,presetFiles:presetJson.files.length,savedBytes:new TextEncoder().encode(saved).byteLength,hasSpec:saved.includes('docs/requirements.md'),hasStructure:saved.includes('STRUCTURE')&&saved.includes('[-] logo.png'),status:document.querySelector('#status').textContent};
+      const folderResult={discovered:document.querySelectorAll('.tree-file').length,selected:ContextPackerBrowser.selected().length,ignored:document.querySelectorAll('.tree-file[data-status="ignored"]').length,presetFiles:presetJson.files.length,savedBytes:new TextEncoder().encode(saved).byteLength,hasSpec:saved.includes('docs/requirements.md'),hasStructure:saved.includes('STRUCTURE')&&saved.includes('[-] logo.png')};
+
+      document.querySelector('#status').textContent='aguardando pasta arrastada';const directoryDrop=new Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(directoryDrop,'dataTransfer',{value:{items:[{kind:'file',getAsFileSystemHandle:async()=>root}]}});document.querySelector('#source-drop').dispatchEvent(directoryDrop);
+      await wait(()=>document.querySelector('#status').textContent.includes('Configuração .cpacker carregada'));
+
+      const zipBytes=Uint8Array.from(atob('${zipBase64}'),character=>character.charCodeAt(0)),zipFile=new File([zipBytes],'snapshot-origin.zip',{type:'application/zip'}),transfer=new DataTransfer();transfer.items.add(zipFile);
+      document.querySelector('#source-drop').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:transfer}));
+      await wait(()=>document.querySelectorAll('.tree-file').length===2&&document.querySelector('#folder').textContent.includes('snapshot-origin.zip'));
+      if(document.querySelector('[data-path^=".cpacker"]')) throw new Error('.cpacker do ZIP não deve aparecer');
+      if(!document.querySelector('#save-filters').disabled||!document.querySelector('#save-preset').disabled) throw new Error('ZIP deve permanecer somente leitura');
+      document.querySelector('.tree-file[data-path="snapshot/docs/readme.md"] input').click();
+      await wait(()=>document.querySelector('#preview').value.includes('# From ZIP'));
+      const zipPreview=document.querySelector('#preview').value;
+      if(!zipPreview.includes('sourceType: "zip"')||!zipPreview.includes('sourceName: "snapshot-origin.zip"')) throw new Error('TXT não identifica o ZIP de origem');
+      document.querySelector('.tree-file[data-path="snapshot/docs/readme.md"] input').click();await wait(()=>ContextPackerBrowser.selected().length===0);
+      if(ContextPackerBrowser.cachedContentBytes()!==0) throw new Error('conteúdo desmarcado permaneceu no cache');
+      document.querySelector('.tree-file[data-path="snapshot/docs/readme.md"] input').click();await wait(()=>document.querySelector('#preview').value.includes('# From ZIP'));
+      let releaseOldZip,oldZipStarted=false;const oldZipGate=new Promise(resolve=>{releaseOldZip=resolve}),oldZipFile={name:'old.zip',size:zipBytes.byteLength,arrayBuffer:async()=>{oldZipStarted=true;await oldZipGate;return zipBytes.buffer.slice(zipBytes.byteOffset,zipBytes.byteOffset+zipBytes.byteLength);}};Object.defineProperty(document.querySelector('#zip-input'),'files',{configurable:true,value:[oldZipFile]});document.querySelector('#zip-input').dispatchEvent(new Event('change'));
+      await wait(()=>oldZipStarted);await ContextPackerBrowser.loadZipFile(zipFile);releaseOldZip();await new Promise(resolve=>setTimeout(resolve,50));
+      if(!document.querySelector('#status').textContent.includes('snapshot-origin.zip')||document.querySelector('#status').textContent.includes('substituída')) throw new Error('ZIP antigo sobrescreveu o status da origem nova');
+      let releaseDirectory,enteredDirectory=false;const directoryGate=new Promise(resolve=>{releaseDirectory=resolve}),delayedRoot={name:'delayed-folder',getDirectoryHandle:root.getDirectoryHandle.bind(root),queryPermission:root.queryPermission?.bind(root),requestPermission:root.requestPermission?.bind(root),async *entries(){enteredDirectory=true;await directoryGate;for await(const entry of root.entries())yield entry;}};
+      const staleLoad=ContextPackerBrowser.loadDirectory(delayedRoot);await wait(()=>enteredDirectory);await ContextPackerBrowser.loadZipFile(zipFile);releaseDirectory();await staleLoad.catch(()=>{});await new Promise(resolve=>setTimeout(resolve,50));
+      if(document.querySelectorAll('.tree-file').length!==2||document.querySelector('.tree-file[data-path="notes.txt"]')||!document.querySelector('#status').textContent.includes('snapshot-origin.zip')) throw new Error('carregamento antigo misturou arquivos ou estado com o ZIP mais novo');
+      let releaseRead,readStarted=false;const readGate=new Promise(resolve=>{releaseRead=resolve}),slowHandle={kind:'file',getFile:async()=>({size:4,arrayBuffer:async()=>{readStarted=true;await readGate;return new TextEncoder().encode('slow').buffer;}})},slowRoot={name:'slow-folder',getDirectoryHandle:root.getDirectoryHandle.bind(root),queryPermission:root.queryPermission?.bind(root),requestPermission:root.requestPermission?.bind(root),async *entries(){yield ['slow.txt',slowHandle];}};await ContextPackerBrowser.loadDirectory(slowRoot);document.querySelector('.tree-file[data-path="slow.txt"] input').click();await wait(()=>readStarted);document.querySelector('.tree-file[data-path="slow.txt"] input').click();releaseRead();await new Promise(resolve=>setTimeout(resolve,50));
+      if(ContextPackerBrowser.cachedContentBytes()!==0||ContextPackerBrowser.selected().length!==0) throw new Error('leitura concluída após desmarcar repopulou o cache');
+      await ContextPackerBrowser.loadZipFile(zipFile);
+      return {...folderResult,zipSource:zipPreview.includes('sourceName: "snapshot-origin.zip"'),zipContent:zipPreview.includes('# From ZIP'),status:document.querySelector('#status').textContent};
     })()`);
     assert.equal(result.discovered, 9);
     assert.equal(result.selected, 5);
@@ -152,6 +190,8 @@ const url = process.argv[3];
     assert.equal(result.presetFiles, 5);
     assert.equal(result.hasSpec, true);
     assert.equal(result.hasStructure, true);
+    assert.equal(result.zipSource, true);
+    assert.equal(result.zipContent, true);
     assert.ok(result.savedBytes > 500);
     console.log(JSON.stringify(result, null, 2));
 
