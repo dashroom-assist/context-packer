@@ -66,6 +66,12 @@ assert.deepEqual(JSON.parse(JSON.stringify(core.parseExtensionConfig('{"ignoredE
 assert.throws(() => core.parseExtensionConfig('{"ignoredExtensions":".png"}'), /ignoredExtensions/i);
 assert.deepEqual(JSON.parse(JSON.stringify(core.normalizeExtensionList('.PNG, jpg; .png'))), ['.png', '.jpg']);
 
+assert.equal(core.normalizeExportPrefix(' Implementação T04 '), 'implementacao-t04');
+assert.equal(core.normalizeExportPrefix(''), '');
+assert.throws(() => core.normalizeExportPrefix('../segredo'), /prefixo/i);
+assert.equal(core.buildExportFilename('Implementação', 'WB MVP T04', '2026-09-21T15:34:29'), 'implementacao-wb-mvp-t04-2026-09-21-1534.txt');
+assert.equal(core.buildExportFilename('', 'WB MVP T04', '2026-09-21T15:34:29'), 'wb-mvp-t04-2026-09-21-1534.txt');
+
 const ascii = core.buildAsciiTree('projeto', [
   { path: 'README.md', status: 'excluded' },
   { path: 'docs/a.md', status: 'included' },
@@ -103,6 +109,7 @@ const packageInput = {
   rootName: 'projeto',
   sourceType: 'zip',
   sourceName: 'projeto-snapshot.zip',
+  basePath: 'snapshot',
   files,
   skipped: [{ path: 'docs/opcional.md', reason: 'desmarcado pelo usuário' }],
   errors: [{ path: 'docs/ausente.md', reason: 'não encontrado' }],
@@ -117,10 +124,11 @@ const packageInput = {
   generatedAt: '2026-09-20T12:00:00.000Z'
 };
 const pack = core.buildPackage(packageInput);
-assert.match(pack, /formatVersion: "0.2.0"/);
+assert.match(pack, /formatVersion: "0.2.1"/);
 assert.match(pack, /exporter: "Workbench Context Packer 1.0"/);
 assert.match(pack, /sourceType: "zip"/);
 assert.match(pack, /sourceName: "projeto-snapshot\.zip"/);
+assert.match(pack, /basePath: "snapshot"/);
 assert.match(pack, /included: 2/);
 assert.match(pack, /skipped: 2/);
 assert.match(pack, /errors: 1/);
@@ -146,5 +154,10 @@ const selectedStructure = packWithSelectedStructure.split('\nSTRUCTURE\n')[1].sp
 assert.match(selectedStructure, /\[x\] a\.md/);
 assert.match(selectedStructure, /\[x\] b\.js/);
 assert.doesNotMatch(selectedStructure, /logo\.png|opcional\.md|ausente\.md/);
+
+const packWithRequestedGaps = core.buildPackage({...packageInput, structureMode:'selected', inventory:packageInput.inventory.map(item=>['assets/logo.png','docs/ausente.md'].includes(item.path)?{...item,requestedByPreset:true}:item)});
+const requestedGapStructure = packWithRequestedGaps.split('\nSTRUCTURE\n')[1].split('\n\nLEGEND\n')[0];
+assert.match(requestedGapStructure, /\[-\] logo\.png/);
+assert.match(requestedGapStructure, /\[!\] ausente\.md/);
 
 console.log('context-packer core: ok');
