@@ -7,6 +7,8 @@ assert.ok(fs.existsSync(htmlPath), 'Context Packer ainda não foi implementado.'
 const html = fs.readFileSync(htmlPath, 'utf8');
 const match = html.match(/<script id="context-packer-core">([\s\S]*?)<\/script>/);
 assert.ok(match, 'Núcleo testável não encontrado.');
+assert.match(html, /id="ext-ignore"[^>]*disabled/, 'extensões devem iniciar bloqueadas até o banco local carregar');
+assert.match(html, /id="ignore-rules"[^>]*disabled/, 'regras devem iniciar bloqueadas até o banco local carregar');
 
 const context = { globalThis: {}, TextEncoder, TextDecoder };
 vm.runInNewContext(match[1], context);
@@ -101,6 +103,63 @@ assert.deepEqual(JSON.parse(JSON.stringify(core.parsePresetDocument(presetText))
 });
 assert.throws(() => core.parsePresetDocument('{"name":"x","files":["../segredo"]}'), /inválido/i);
 
+const configurationText = core.buildConfigurationDocument({
+  ignoredExtensions: ['.png', '.zip'],
+  ignoreRules: '*.log\n',
+  exportPrefixes: ['contexto', 'implementacao'],
+  exportPrefix: 'implementacao',
+  presets: {
+    'example-bundle.json': JSON.parse(presetText)
+  }
+});
+assert.deepEqual(JSON.parse(JSON.stringify(core.parseConfigurationDocument(configurationText))), {
+  ignoredExtensions: ['.png', '.zip'],
+  ignoreRules: '*.log\n',
+  exportPrefixes: ['contexto', 'implementacao'],
+  exportPrefix: 'implementacao',
+  presets: {
+    'example-bundle.json': {
+      name: 'Example bundle',
+      files: [
+        { path: 'docs/a.md', annotation: '0.1.0' },
+        { path: 'src/b.js', annotation: '' }
+      ]
+    }
+  }
+});
+assert.throws(() => core.parseConfigurationDocument('{"settings":{}}'), /configurações/i);
+assert.throws(() => core.parseConfigurationDocument(JSON.stringify({
+  formatVersion: '1.0',
+  settings: {ignoredExtensions: ['.png'], ignoreRules: '', exportPrefixes: ['contexto'], exportPrefix: 'contexto'},
+  presets: {'../segredo.json': JSON.parse(presetText)}
+})), /preset/i);
+assert.throws(() => core.parseConfigurationDocument(JSON.stringify({
+  formatVersion: '1.0',
+  settings: {ignoredExtensions: ['.png'], ignoreRules: '', exportPrefixes: Array.from({length:30}, (_, index) => `prefix-${index}`), exportPrefix: 'extra'},
+  presets: {}
+})), /30 prefixos/i);
+assert.throws(() => core.parseConfigurationDocument('x'.repeat(5 * 1024 * 1024 + 1)), /5 MB/i);
+assert.throws(() => core.parseConfigurationDocument(JSON.stringify({
+  formatVersion: '1.0',
+  settings: {ignoredExtensions: ['.png'], ignoreRules: 'x'.repeat(256 * 1024 + 1), exportPrefixes: ['contexto'], exportPrefix: 'contexto'},
+  presets: {}
+})), /regras.*256 KB/i);
+assert.throws(() => core.parseConfigurationDocument(JSON.stringify({
+  formatVersion: '1.0',
+  settings: {ignoredExtensions: ['.png'], ignoreRules: '', exportPrefixes: ['contexto'], exportPrefix: 'contexto'},
+  presets: Object.fromEntries(Array.from({length:101}, (_, index) => [`preset-${index}.json`, JSON.parse(presetText)]))
+})), /100 presets/i);
+assert.throws(() => core.parseConfigurationDocument(JSON.stringify({
+  formatVersion: '1.0',
+  settings: {ignoredExtensions: ['.png'], ignoreRules: '', exportPrefixes: ['contexto'], exportPrefix: 'contexto'},
+  presets: {'oversized.json': {name:'x'.repeat(121), files:[{path:'README.md', annotation:''}]}}
+})), /nome.*120/i);
+assert.throws(() => core.parseConfigurationDocument(JSON.stringify({
+  formatVersion: '1.0',
+  settings: {ignoredExtensions: ['.png'], ignoreRules: '', exportPrefixes: ['contexto'], exportPrefix: 'contexto'},
+  presets: {'oversized.json': {name:'ok', files:[{path:'README.md', annotation:'x'.repeat(201)}]}}
+})), /anotação.*200/i);
+
 const files = [
   { path: 'docs/a.md', annotation: '0.1.0', size: 5, content: 'Olá\n' },
   { path: 'src/b.js', annotation: '', size: 18, content: 'const x = "BEGIN";' }
@@ -125,7 +184,7 @@ const packageInput = {
 };
 const pack = core.buildPackage(packageInput);
 assert.match(pack, /formatVersion: "0.2.1"/);
-assert.match(pack, /exporter: "Workbench Context Packer 1.0"/);
+assert.match(pack, /exporter: "Workbench Context Packer 1.3"/);
 assert.match(pack, /sourceType: "zip"/);
 assert.match(pack, /sourceName: "projeto-snapshot\.zip"/);
 assert.match(pack, /basePath: "snapshot"/);

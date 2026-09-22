@@ -5,47 +5,65 @@ Ferramenta HTML local para selecionar arquivos de uma pasta ou ZIP e gerar um ú
 ## Uso
 
 1. Abra `index.html` por duplo clique no Edge ou Chrome.
-2. No passo 1, selecione uma pasta, selecione um ZIP ou arraste uma dessas origens para o painel. Depois, escolha a **pasta base**: a árvore, os presets e os caminhos do TXT passam a começar nela. Isso permite, por exemplo, abrir um ZIP que contém `snapshot/projeto/` e aplicar um preset escrito como `README.md` ou `src/app.js` escolhendo `snapshot/projeto` como base.
-3. Na primeira abertura de uma pasta, a ferramenta cria `.cpacker/config.json` e `.cpacker/.cpignore` com os valores padrão na origem selecionada. Para ZIPs, o passo 2 usa filtros temporários e mantém o arquivo de origem somente leitura.
-4. Ainda no passo 2, escolha um prefixo para o TXT ou adicione um novo. A prévia mostra o nome no formato `<prefixo>-<pasta-base>-AAAA-MM-DD-HHmm.txt`. A opção **Sem prefixo** mantém apenas pasta, data e hora. Em pastas, a lista e a última escolha são salvas automaticamente; em ZIPs, valem somente durante a sessão.
+2. No passo 1, selecione uma pasta, selecione um ZIP ou arraste uma dessas origens para o painel. Para uma pasta, o ícone de atualização ao lado do nome relê os arquivos após mudanças externas, preservando a pasta base e os itens selecionados que ainda existirem. Depois, escolha a **pasta base**: a árvore, os presets e os caminhos do TXT passam a começar nela. Isso permite, por exemplo, abrir um ZIP que contém `snapshot/projeto/` e aplicar um preset escrito como `README.md` ou `src/app.js` escolhendo `snapshot/projeto` como base.
+3. As configurações são carregadas automaticamente do banco nativo do Edge/Chrome e valem para todas as pastas e ZIPs. A barra **Configuração global**, fora dos passos, oferece **Exportar** e **Carregar** para transportar filtros, presets e prefixos juntos. Nenhum arquivo de configuração é criado na origem.
+4. No passo 2, edite as extensões ou regras e clique em **Aplicar alterações**. Enquanto houver diferenças ainda não aplicadas, a ferramenta mostra `Alterações não aplicadas`, destaca o botão e bloqueia a exportação da configuração antiga. **Restaurar filtros** redefine somente essa seção.
 5. No passo 3, marque arquivos ou pastas diretamente na árvore. A renderização usa verde para incluídos, amarelo somente para arquivos ignorados pedidos pelo preset aplicado, cinza para os demais arquivos ignorados pelos filtros e vermelho para erros; essas cores não alteram o TXT exportado.
-6. Opcionalmente, abra **Presets** no passo 3 para colar uma lista de caminhos ou carregar um JSON salvo. Ao aplicar, a árvore expande somente as pastas necessárias para revelar os arquivos pedidos. Um arquivo existente, mas bloqueado pelos filtros, continua registrado uma única vez como ignorado — inclusive na estrutura parcial. O resultado aparece apenas em um toast fechável: verde quando todos foram marcados, amarelo quando há somente itens ignorados e vermelho quando algum caminho não foi encontrado ou apresentou erro. O toast desaparece automaticamente após 5 segundos em caso de sucesso ou 8 segundos nos demais casos.
-7. Para reutilizar a seleção atual de uma pasta, ainda em **Presets**, informe um nome e clique em **Salvar**. O arquivo será criado em `.cpacker/presets/<nome>.json`. Em ZIPs, presets salvos ficam desabilitados porque a origem é somente leitura.
-8. Confira a prévia TXT, atualizada conforme a seleção muda. O checkbox de estrutura tem três estados: desmarcado não inclui árvore; `−` inclui somente os arquivos selecionados; `✓` inclui a estrutura completa descoberta.
-9. Use **Copiar** para enviar a prévia à área de transferência ou **Salvar TXT** para escolher o destino. A janela de salvamento já abre com o nome sugerido pelo prefixo selecionado.
-10. Revise o TXT antes de compartilhá-lo ou processá-lo em outra ferramenta.
+6. Opcionalmente, abra **Presets** no passo 3 para colar uma lista de caminhos ou carregar um preset salvo. Ao aplicar, a árvore expande somente as pastas necessárias para revelar os arquivos pedidos. Um arquivo existente, mas bloqueado pelos filtros, continua registrado uma única vez como ignorado — inclusive na estrutura parcial. O resultado aparece apenas em um toast fechável: verde quando todos foram marcados, amarelo quando há somente itens ignorados e vermelho quando algum caminho está ausente ou não pôde ser lido.
+7. Para reutilizar a seleção atual, ainda em **Presets**, informe um nome e clique em **Salvar**. O preset fica no banco do navegador e também funciona para qualquer pasta ou ZIP, sem modificar a origem. **Remover todos os presets** limpa somente os presets salvos.
+8. No passo 4, confira a **Prévia do arquivo** e o nome que será baixado. Abra **Nome e prefixo** para escolher, adicionar ou remover prefixos; **Restaurar prefixos** redefine somente a lista e o prefixo ativo. O nome segue o formato `<prefixo>-<pasta-base>-AAAA-MM-DD-HHmm.txt`; a opção **Sem prefixo** mantém apenas pasta, data e hora.
+9. O checkbox de estrutura tem três estados: desmarcado não inclui árvore; `−` inclui somente os arquivos selecionados; `✓` inclui a estrutura completa descoberta. Use **Copiar** para enviar a prévia à área de transferência ou **Baixar** para escolher o destino usando exatamente o nome exibido.
+10. Revise o arquivo antes de compartilhá-lo ou processá-lo em outra ferramenta.
 
 O cabeçalho do TXT registra `sourceType`, `sourceName` e `basePath`. Para um ZIP, `sourceName` preserva o nome original do arquivo selecionado; `basePath` registra o subdiretório escolhido, ou `.` quando a origem inteira é a base. Os caminhos do inventário e do conteúdo são relativos à pasta base.
 
 Linhas como `docs/requirements.md 1.0` são resolvidas primeiro literalmente e, se esse arquivo não existir, como `docs/requirements.md`, preservando `1.0` como anotação no inventário.
 
-## Configuração dos filtros
+## Configurações no navegador e arquivo de exportação
 
-Na raiz escolhida, a configuração fica em `.cpacker/`. O arquivo `.cpacker/config.json` usa este formato:
+O aplicativo mantém uma única configuração global no IndexedDB do navegador. Ela inclui extensões ignoradas, regras, prefixos, prefixo ativo e presets. Trocar de pasta ou ZIP não troca nem sobrescreve essas opções.
+
+Na primeira configuração, se ainda não houver personalização global e a pasta aberta contiver uma configuração antiga em `.cpacker/`, os filtros, prefixos e presets são migrados uma única vez para o IndexedDB. A origem é lida sem ser modificada. Se o IndexedDB estiver indisponível, a ferramenta continua funcionando com configurações temporárias válidas somente durante a sessão.
+
+Use **Exportar** para salvar uma cópia portátil e **Carregar** para substituir a configuração local pelo conteúdo do arquivo. As restaurações são independentes: filtros, presets e prefixos podem ser redefinidos em suas próprias seções, sempre após confirmação. O arquivo JSON reúne tudo que antes era distribuído entre `config.json`, `.cpignore` e os arquivos de presets:
 
 ```json
 {
-  "ignoredExtensions": [".png", ".jpg", ".zip"],
-  "exportPrefixes": ["contexto", "implementacao", "revisao"],
-  "exportPrefix": "implementacao"
+  "formatVersion": "1.0",
+  "exporter": "Workbench Context Packer 1.3",
+  "settings": {
+    "ignoredExtensions": [".png", ".jpg", ".zip"],
+    "ignoreRules": "*.log\nbuild/\n",
+    "exportPrefixes": ["contexto", "implementacao", "revisao"],
+    "exportPrefix": "implementacao"
+  },
+  "presets": {
+    "revisao.json": {
+      "name": "Revisão",
+      "files": [
+        { "path": "README.md", "annotation": "" }
+      ]
+    }
+  }
 }
 ```
 
 `exportPrefixes` guarda até 30 opções normalizadas para o nome do arquivo. `exportPrefix` registra a última opção escolhida; use uma string vazia para salvar sem prefixo.
 
-O arquivo `.cpacker/.cpignore` recebe uma regra por linha e aceita `*`, `**`, `?`, comentários com `#` e negação com `!`. A proteção de `.cpacker/` é interna e não precisa constar nesse arquivo.
+`ignoreRules` recebe uma regra por linha e aceita `*`, `**`, `?`, comentários com `#` e negação com `!`. A proteção de `.cpacker/` é interna e não precisa constar nas regras.
 
-Se a pasta ou um dos arquivos não existir, a ferramenta cria o item ausente com os valores padrão. A pasta `.cpacker/` é sempre protegida e não aparece no passo 3, na árvore ou no inventário da prévia TXT.
+Pastas `.cpacker/` continuam protegidas e não aparecem no passo 3, na árvore ou no inventário da prévia TXT. Após uma eventual migração inicial somente leitura, elas não são mais consultadas nem alteradas.
 
 ## Limites
 
 - execução offline e sem dependências;
-- File System Access API, normalmente disponível em Edge/Chrome;
-- os arquivos de origem são somente leitura; a ferramenta só grava configuração e presets JSON em `.cpacker/`, além do TXT escolhido pelo usuário;
+- IndexedDB e File System Access API, normalmente disponíveis em Edge/Chrome;
+- os arquivos de origem são somente leitura; a ferramenta grava configurações e presets apenas no banco do navegador, além dos arquivos JSON e TXT exportados explicitamente pelo usuário;
 - até 2.000 itens descobertos, 2 MB por arquivo e 20 MB de conteúdo selecionado;
 - ZIPs de até 100 MB, nos métodos Store ou Deflate; ZIP64, arquivos criptografados e arquivos divididos em volumes não são compatíveis;
+- arquivos de configuração JSON de até 5 MB, com no máximo 100 presets, 50.000 referências de arquivos somadas e 256 KB de regras;
 - arquivos textuais UTF-8;
-- proteção interna de `.cpacker`, `.env`, `.git`, `node_modules` e `.patcher-backups`; as demais exclusões vêm de `.cpacker/.cpignore`;
+- proteção interna de `.cpacker`, `.env`, `.git`, `node_modules` e `.patcher-backups`; as demais exclusões vêm das regras salvas no navegador;
 - itens selecionados, desmarcados, ignorados e falhas ficam registrados no inventário e na árvore ASCII do TXT;
 - o pacote de contexto não é backup.
 

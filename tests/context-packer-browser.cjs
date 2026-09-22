@@ -38,6 +38,7 @@ const zipBase64=buildZip([['snapshot/docs/readme.md','# From ZIP\\n',8],['snapsh
     await evaluate(`new Promise(resolve => document.readyState === 'complete' ? resolve() : addEventListener('load', resolve, {once:true}))`);
     assert.equal(await evaluate(`typeof ContextPackerCore`), 'object');
     assert.equal(await evaluate(`typeof ContextPackerBrowser`), 'object');
+    await evaluate(`ContextPackerBrowser.configurationReady()`);
     assert.equal(await evaluate(`(async()=>{let pulls=0,cancelled=false;const stream=new ReadableStream({pull(controller){pulls++;controller.enqueue(new Uint8Array(1024));},cancel(){cancelled=true;}});try{await ContextPackerBrowser.readStreamLimited(stream,1500);}catch(error){return pulls<10&&cancelled&&/limite/i.test(error.message);}return false;})()`), true, 'descompactação deve parar assim que exceder o limite');
     assert.equal(await evaluate(`document.querySelector('#choose').disabled`), false);
     assert.equal(await evaluate(`document.querySelector('#preset-menu').open`), false);
@@ -60,6 +61,16 @@ const zipBase64=buildZip([['snapshot/docs/readme.md','# From ZIP\\n',8],['snapsh
     await send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
     await send('Page.navigate', { url: `http://127.0.0.1:${server.address().port}/index.html` });
     for (let i = 0; i < 100; i++) { if (await evaluate(`document.readyState==='complete' && typeof ContextPackerBrowser==='object'`)) break; await new Promise(resolve => setTimeout(resolve, 25)); }
+    await evaluate(`ContextPackerBrowser.configurationReady()`);
+    await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.deleteDatabase('context-packer');request.onsuccess=resolve;request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('IndexedDB bloqueado'));})`);
+    await send('Page.reload');
+    for (let i = 0; i < 100; i++) { if (await evaluate(`document.readyState==='complete' && typeof ContextPackerBrowser==='object'`)) break; await new Promise(resolve => setTimeout(resolve, 25)); }
+    await evaluate(`ContextPackerBrowser.configurationReady()`);
+    assert.equal(await evaluate(`(async()=>{const wait=async test=>{for(let elapsed=0;elapsed<3000;elapsed+=25){if(test())return;await new Promise(resolve=>setTimeout(resolve,25));}throw new Error('timeout na migração concorrente');},notFound=()=>new DOMException('ausente','NotFoundError');let releaseRead,readStarted=false;const gate=new Promise(resolve=>{releaseRead=resolve}),legacyText=JSON.stringify({ignoredExtensions:['.png'],exportPrefixes:['legado-concorrente'],exportPrefix:'legado-concorrente'}),cpacker={getFileHandle:async name=>name==='config.json'?{kind:'file',getFile:async()=>({size:new Blob([legacyText]).size,text:async()=>{readStarted=true;await gate;return legacyText;}})}:Promise.reject(notFound()),getDirectoryHandle:async()=>{throw notFound();}},root={name:'concurrent-root',getDirectoryHandle:async name=>name==='.cpacker'?cpacker:Promise.reject(notFound()),async *entries(){yield ['README.md',{kind:'file',getFile:async()=>new File(['# Concorrência'],'README.md')}];}};const loading=ContextPackerBrowser.loadDirectory(root);await wait(()=>readStarted);await ContextPackerBrowser.importConfiguration(JSON.stringify({formatVersion:'1.0',settings:{ignoredExtensions:['.txt'],ignoreRules:'*.novo\\n',exportPrefixes:['usuario'],exportPrefix:'usuario'},presets:{}}));releaseRead();await loading.catch(()=>{});await new Promise(resolve=>setTimeout(resolve,50));const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('context-packer',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);}),profile=await new Promise((resolve,reject)=>{const request=db.transaction('source-configurations').objectStore('source-configurations').get('global');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});db.close();return profile.configuration.exportPrefix==='usuario'&&JSON.parse(ContextPackerBrowser.exportConfiguration()).settings.exportPrefix==='usuario';})()`), true, 'migração não deve sobrescrever uma configuração global salva durante a leitura do legado');
+    await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.deleteDatabase('context-packer');request.onsuccess=resolve;request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('IndexedDB bloqueado'));})`);
+    await send('Page.reload');
+    for (let i = 0; i < 100; i++) { if (await evaluate(`document.readyState==='complete' && typeof ContextPackerBrowser==='object'`)) break; await new Promise(resolve => setTimeout(resolve, 25)); }
+    await evaluate(`ContextPackerBrowser.configurationReady()`);
     await send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });
 
     const result = await evaluate(`(async () => {
@@ -67,14 +78,25 @@ const zipBase64=buildZip([['snapshot/docs/readme.md','# From ZIP\\n',8],['snapsh
       if(document.querySelector('.eyebrow').textContent!=='WORKBENCH / TOOL') throw new Error('identificação pública incorreta');
       const description=document.querySelector('header .muted').textContent;
       if(!description.includes('empacotamento de arquivos')||/coordena[cç][aã]o/i.test(description)) throw new Error('descrição deve ser genérica');
-      if(document.querySelector('.badge').textContent!=='OFFLINE TOOL · v1.0') throw new Error('selo da versão incorreto');
+      if(document.querySelector('.badge').textContent!=='OFFLINE TOOL · v1.3') throw new Error('selo da versão incorreto');
       if(!document.querySelector('#choose-zip')||!document.querySelector('#source-drop')) throw new Error('passo 1 deve permitir selecionar ou arrastar ZIP');
+      const refreshSource=document.querySelector('#refresh-source');if(!refreshSource||!refreshSource.hidden||getComputedStyle(refreshSource).display!=='none'||!refreshSource.disabled||!refreshSource.querySelector('svg')||refreshSource.textContent.trim()) throw new Error('atualização da pasta deve iniciar oculta e usar somente ícone');
+      if(getComputedStyle(refreshSource).backgroundColor!=='rgba(0, 0, 0, 0)'||getComputedStyle(refreshSource).borderTopWidth!=='0px') throw new Error('botão de atualizar deve ficar sem fundo e sem borda');
       if(!document.querySelector('#source-drop h2').textContent.includes('Escolha a origem e pasta base')) throw new Error('passo 1 deve identificar origem e pasta base');
       if(!document.querySelector('#base-folder')||!document.querySelector('#base-folder').disabled) throw new Error('pasta base deve iniciar indisponível');
       if(!document.querySelector('#toast')||!document.querySelector('#toast-close')||!document.querySelector('#toast').hidden) throw new Error('toast fechável deve iniciar oculto');
-      const exportPrefixGrid=document.querySelector('.export-prefix-grid');if(!exportPrefixGrid||getComputedStyle(exportPrefixGrid).gridTemplateColumns.split(' ').length!==2) throw new Error('prefixo ativo e novo prefixo devem usar duas colunas');
+      const configManagement=document.querySelector('#config-management');if(!configManagement||configManagement.closest('.filters-panel')||!(configManagement.compareDocumentPosition(document.querySelector('.setup'))&Node.DOCUMENT_POSITION_FOLLOWING)) throw new Error('Exportar e Carregar devem ficar numa área global antes dos passos');
+      if(document.querySelector('#export-settings').textContent!=='Exportar'||document.querySelector('#import-settings').textContent!=='Carregar'||document.querySelector('#restore-settings')) throw new Error('área global deve conter somente Exportar e Carregar');
+      if(!document.querySelector('.filters-panel h2').textContent.includes('Filtros de arquivos')||!document.querySelector('#restore-filters')) throw new Error('passo 2 deve tratar somente dos filtros');
+      const prefixSettings=document.querySelector('#prefix-settings'),exportPrefixGrid=document.querySelector('.export-prefix-grid');if(!prefixSettings||prefixSettings.open||!prefixSettings.closest('#preview-panel')||!exportPrefixGrid) throw new Error('prefixos devem iniciar recolhidos no passo 4');
+      if(document.querySelector('#export-name-preview').closest('details')||!document.querySelector('#export-name-preview').closest('.file-actions')) throw new Error('nome final deve ficar sempre visível junto às ações do arquivo');
+      if(!document.querySelector('#restore-prefixes')||!document.querySelector('#clear-saved-presets')?.closest('#preset-menu')) throw new Error('prefixos e presets precisam de restauração individual');
+      if(document.querySelector('#save-filters')) throw new Error('não deve existir botão separado para salvar alterações');
+      if(document.querySelector('#apply-filters').textContent!=='Aplicar alterações'||!document.querySelector('#apply-filters').classList.contains('primary')) throw new Error('aplicar alterações deve ser a ação primária');
+      if(!document.querySelector('#add-export-prefix').classList.contains('primary')) throw new Error('adicionar prefixo deve ser ação primária');
+      if(!document.querySelector('#config-dirty').hidden||!document.querySelector('#apply-filters').disabled||document.querySelector('#export-settings').disabled) throw new Error('estado inicial das configurações incorreto');
       const copyButton=document.querySelector('#copy');
-      if(!copyButton||copyButton.nextElementSibling?.id!=='generate') throw new Error('Copiar deve ficar à esquerda de Salvar TXT');
+      if(!document.querySelector('#preview-panel h2').textContent.includes('Prévia do arquivo')||!copyButton||copyButton.nextElementSibling?.id!=='generate'||document.querySelector('#generate').textContent!=='Baixar') throw new Error('passo 4 deve usar Prévia do arquivo, Copiar e Baixar');
       const structureToggle=document.querySelector('#show-structure');
       if(!structureToggle||!structureToggle.checked) throw new Error('controle de estrutura deve iniciar marcado');
       if(document.querySelector('#structure-mode').textContent!=='completa') throw new Error('estado completo não foi mostrado');
@@ -86,6 +108,45 @@ const zipBase64=buildZip([['snapshot/docs/readme.md','# From ZIP\\n',8],['snapsh
         for(const part of parts) dir=await dir.getDirectoryHandle(part,{create:true});
         const handle=await dir.getFileHandle(name,{create:true}); const stream=await handle.createWritable(); await stream.write(content); await stream.close();
       }
+      async function writeUnder(base,filePath,content) {
+        const parts=filePath.split('/'),name=parts.pop();let dir=base;
+        for(const part of parts)dir=await dir.getDirectoryHandle(part,{create:true});
+        const handle=await dir.getFileHandle(name,{create:true}),stream=await handle.createWritable();await stream.write(content);await stream.close();
+      }
+      const notFound=()=>new DOMException('ausente','NotFoundError'),textHandle=(text,size=new Blob([text]).size)=>({kind:'file',getFile:async()=>({size,text:async()=>text,arrayBuffer:async()=>new TextEncoder().encode(text).buffer})}),sourceEntries=async function*(){yield ['README.md',textHandle('# Teste de migração\\n')];};
+      let releaseLegacyRead,legacyReadStarted=false;const legacyReadGate=new Promise(resolve=>{releaseLegacyRead=resolve}),delayedLegacyConfig=JSON.stringify({ignoredExtensions:['.png'],exportPrefixes:['antigo'],exportPrefix:'antigo'}),delayedCpacker={getFileHandle:async name=>name==='config.json'?{kind:'file',getFile:async()=>({size:new Blob([delayedLegacyConfig]).size,text:async()=>{legacyReadStarted=true;await legacyReadGate;return delayedLegacyConfig;}})}:Promise.reject(notFound()),getDirectoryHandle:async()=>{throw notFound();}},delayedLegacyRoot={name:'old-root',getDirectoryHandle:async name=>name==='.cpacker'?delayedCpacker:Promise.reject(notFound()),entries:sourceEntries},newerRoot={name:'new-root',getDirectoryHandle:async()=>{throw notFound();},entries:sourceEntries};
+      const oldLoad=ContextPackerBrowser.loadDirectory(delayedLegacyRoot);await wait(()=>legacyReadStarted);await ContextPackerBrowser.loadDirectory(newerRoot);releaseLegacyRead();await oldLoad.catch(()=>{});await new Promise(resolve=>setTimeout(resolve,50));
+      if(!document.querySelector('#folder').textContent.includes('new-root')||JSON.parse(ContextPackerBrowser.exportConfiguration()).settings.exportPrefix==='antigo') throw new Error('migração antiga sobrescreveu uma origem ou configuração mais recente');
+      const commitWindowConfig=JSON.stringify({ignoredExtensions:['.png'],exportPrefixes:['janela'],exportPrefix:'janela'}),commitWindowCpacker={getFileHandle:async name=>name==='config.json'?textHandle(commitWindowConfig):Promise.reject(notFound()),getDirectoryHandle:async()=>{throw notFound();}},commitWindowRoot={name:'commit-window-root',getDirectoryHandle:async name=>name==='.cpacker'?commitWindowCpacker:Promise.reject(notFound()),entries:sourceEntries};
+      const originalMigrationPut=IDBObjectStore.prototype.put;let commitWindowTriggered=false,newerCommitLoad=null;IDBObjectStore.prototype.put=function(value,...args){const request=originalMigrationPut.call(this,value,...args);if(value?.legacyMigrationComplete&&!commitWindowTriggered){commitWindowTriggered=true;queueMicrotask(()=>{newerCommitLoad=ContextPackerBrowser.loadDirectory(newerRoot);});}return request;};
+      await ContextPackerBrowser.loadDirectory(commitWindowRoot).catch(()=>{});await wait(()=>commitWindowTriggered&&newerCommitLoad);await newerCommitLoad;IDBObjectStore.prototype.put=originalMigrationPut;
+      const migrationDb=await new Promise((resolve,reject)=>{const request=indexedDB.open('context-packer',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);}),migrationProfile=await new Promise((resolve,reject)=>{const request=migrationDb.transaction('source-configurations').objectStore('source-configurations').get('global');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});migrationDb.close();
+      if(migrationProfile.configuration.exportPrefix==='janela') throw new Error('migração obsoleta foi persistida durante a janela de commit');
+      const zipCommitConfig=JSON.stringify({ignoredExtensions:['.png'],exportPrefixes:['zip-janela'],exportPrefix:'zip-janela'}),zipCommitCpacker={getFileHandle:async name=>name==='config.json'?textHandle(zipCommitConfig):Promise.reject(notFound()),getDirectoryHandle:async()=>{throw notFound();}},zipCommitRoot={name:'zip-commit-root',getDirectoryHandle:async name=>name==='.cpacker'?zipCommitCpacker:Promise.reject(notFound()),entries:sourceEntries},migrationZipBytes=Uint8Array.from(atob('${zipBase64}'),character=>character.charCodeAt(0)),migrationZipFile=new File([migrationZipBytes],'migration-replacement.zip',{type:'application/zip'});
+      let zipCommitTriggered=false,newerZipLoad=null;IDBObjectStore.prototype.put=function(value,...args){const request=originalMigrationPut.call(this,value,...args);if(value?.legacyMigrationComplete&&!zipCommitTriggered){zipCommitTriggered=true;queueMicrotask(()=>{newerZipLoad=ContextPackerBrowser.loadZipFile(migrationZipFile);});}return request;};
+      await ContextPackerBrowser.loadDirectory(zipCommitRoot).catch(()=>{});await wait(()=>zipCommitTriggered&&newerZipLoad);await newerZipLoad;IDBObjectStore.prototype.put=originalMigrationPut;
+      const zipMigrationDb=await new Promise((resolve,reject)=>{const request=indexedDB.open('context-packer',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);}),zipMigrationProfile=await new Promise((resolve,reject)=>{const request=zipMigrationDb.transaction('source-configurations').objectStore('source-configurations').get('global');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});zipMigrationDb.close();
+      if(zipMigrationProfile.configuration.exportPrefix==='zip-janela') throw new Error('troca por ZIP não cancelou a migração obsoleta');
+      const invalidCpacker={getFileHandle:async name=>name==='config.json'?textHandle('{inválido'):Promise.reject(notFound()),getDirectoryHandle:async()=>{throw notFound();}};
+      const invalidLegacyRoot={name:'legacy-invalid',getDirectoryHandle:async name=>{if(name==='.cpacker')return invalidCpacker;throw notFound();},entries:sourceEntries};
+      await ContextPackerBrowser.loadDirectory(invalidLegacyRoot);
+      if(!document.querySelector('.tree-file[data-path="README.md"]')||!document.querySelector('#status').textContent.includes('Migração ignorada')) throw new Error('configuração antiga inválida bloqueou a abertura da pasta');
+      const excessivePresets={async *entries(){for(let index=0;index<501;index++)yield ['ignorado-'+index+'.txt',textHandle('x')];}},excessiveCpacker={getFileHandle:async()=>{throw notFound();},getDirectoryHandle:async name=>name==='presets'?excessivePresets:Promise.reject(notFound())},excessiveLegacyRoot={name:'legacy-excessive',getDirectoryHandle:async name=>name==='.cpacker'?excessiveCpacker:Promise.reject(notFound()),entries:sourceEntries};
+      await ContextPackerBrowser.loadDirectory(excessiveLegacyRoot);
+      if(!document.querySelector('.tree-file[data-path="README.md"]')||!document.querySelector('#status').textContent.includes('500 entradas')) throw new Error('enumeração excessiva de presets antigos não foi limitada sem bloquear a origem');
+      let legacyReads=0;const largePreset=JSON.stringify({formatVersion:'1.0',name:'Grande',files:[{path:'README.md',annotation:''}]}),budgetPresets={async *entries(){for(let index=0;index<11;index++)yield ['grande-'+index+'.json',{kind:'file',getFile:async()=>({size:512*1024,text:async()=>{legacyReads++;return largePreset;}})}];}},budgetCpacker={getFileHandle:async()=>{throw notFound();},getDirectoryHandle:async name=>name==='presets'?budgetPresets:Promise.reject(notFound())},budgetLegacyRoot={name:'legacy-budget',getDirectoryHandle:async name=>name==='.cpacker'?budgetCpacker:Promise.reject(notFound()),entries:sourceEntries};
+      await ContextPackerBrowser.loadDirectory(budgetLegacyRoot);
+      if(legacyReads>10||!document.querySelector('#status').textContent.includes('5 MB')) throw new Error('migração antiga excedeu o orçamento agregado de leitura');
+      const legacyRoot=await root.getDirectoryHandle('legacy-project',{create:true});
+      await writeUnder(legacyRoot,'README.md','# Legacy project\\n');
+      await writeUnder(legacyRoot,'.cpacker/config.json',JSON.stringify({ignoredExtensions:['.png','.zip'],exportPrefixes:['legado'],exportPrefix:'legado'}));
+      await writeUnder(legacyRoot,'.cpacker/.cpignore','*.legacy\\n');
+      await writeUnder(legacyRoot,'.cpacker/presets/legado.json',JSON.stringify({formatVersion:'1.0',name:'Legado',files:[{path:'README.md',annotation:'1.0'}]}));
+      await ContextPackerBrowser.loadDirectory(legacyRoot);
+      const migratedLegacy=JSON.parse(ContextPackerBrowser.exportConfiguration());
+      if(migratedLegacy.settings.exportPrefix!=='legado'||migratedLegacy.settings.ignoreRules!=='*.legacy\\n'||!migratedLegacy.presets['legado.json']) throw new Error('configuração .cpacker antiga não foi migrada para o banco local');
+      await root.removeEntry('legacy-project',{recursive:true});
+      await ContextPackerBrowser.importConfiguration(JSON.stringify({formatVersion:'1.0',settings:{ignoredExtensions:['.png','.jpg','.jpeg','.gif','.webp','.ico','.pdf','.zip','.gz','.7z','.exe','.dll','.map'],ignoreRules:'# Uma regra por linha; aceita *, ** e ?\\n.git/\\nnode_modules/\\n.patcher-backups/\\nbackups/\\npatches/\\nrecords/\\n.env\\n.env.*\\n',exportPrefixes:['contexto'],exportPrefix:'contexto'},presets:{}}));
       await write('README.md','# Example project\\n');
       await write('src/app.js','export const app = true;\\n');
       await write('src/utils.js','export const sum = (a,b) => a+b;\\n');
@@ -101,27 +162,40 @@ const zipBase64=buildZip([['snapshot/docs/readme.md','# From ZIP\\n',8],['snapsh
       let saved='',suggestedName='';
       window.showSaveFilePicker=async options=>{suggestedName=options.suggestedName;return {createWritable:async()=>({write:async value=>{saved=String(value)},close:async()=>{}})};};
       document.querySelector('#choose').click(); await wait(()=>document.querySelectorAll('.tree-file').length===10);
+      if(refreshSource.hidden||refreshSource.disabled) throw new Error('atualização deve ficar disponível para uma pasta carregada');
+      document.querySelector('.tree-file[data-path="README.md"] input').click();await wait(()=>ContextPackerBrowser.selected().length===1);await write('new-after-refresh.md','# Novo\\n');refreshSource.click();await wait(()=>document.querySelector('.tree-file[data-path="new-after-refresh.md"]')&&document.querySelectorAll('.tree-file').length===11&&!refreshSource.disabled);
+      if(!document.querySelector('.tree-file[data-path="README.md"] input').checked) throw new Error('atualizar a pasta deve preservar a seleção existente');
+      await root.removeEntry('new-after-refresh.md');refreshSource.click();await wait(()=>!document.querySelector('.tree-file[data-path="new-after-refresh.md"]')&&document.querySelectorAll('.tree-file').length===10&&!refreshSource.disabled);document.querySelector('.tree-file[data-path="README.md"] input').click();await wait(()=>ContextPackerBrowser.selected().length===0);
+      await write('base/docs/a.txt','arquivo da base\\n');await write('docs/a.txt','arquivo da raiz\\n');refreshSource.click();await wait(()=>[...document.querySelector('#base-folder').options].some(option=>option.value==='base'));
+      document.querySelector('#base-folder').value='base';document.querySelector('#base-folder').dispatchEvent(new Event('change'));await wait(()=>document.querySelector('.tree-file[data-path="docs/a.txt"]'));document.querySelector('.tree-file[data-path="docs/a.txt"] input').click();await wait(()=>ContextPackerBrowser.selected().length===1);
+      await root.removeEntry('base',{recursive:true});refreshSource.click();await wait(()=>document.querySelector('#base-folder').value===''&&document.querySelector('.tree-file[data-path="docs/a.txt"]'));
+      if(document.querySelector('.tree-file[data-path="docs/a.txt"] input').checked) throw new Error('arquivo diferente herdou seleção após a pasta base desaparecer');
+      await (await root.getDirectoryHandle('docs')).removeEntry('a.txt');refreshSource.click();await wait(()=>!document.querySelector('.tree-file[data-path="docs/a.txt"]')&&document.querySelectorAll('.tree-file').length===10);
       if([...document.querySelectorAll('#tree details')].some(item=>item.open)) throw new Error('árvore do passo 3 deve iniciar colapsada');
-      const cpacker=await root.getDirectoryHandle('.cpacker');
-      const configJson=JSON.parse(await (await (await cpacker.getFileHandle('config.json')).getFile()).text());
-      const ignoreText=await (await (await cpacker.getFileHandle('.cpignore')).getFile()).text();
-      if(!configJson.ignoredExtensions.includes('.png')) throw new Error('.cpacker/config.json não recebeu os padrões');
-      if(configJson.exportPrefixes.join(',')!=='contexto'||configJson.exportPrefix!=='contexto') throw new Error('.cpacker/config.json não recebeu a configuração inicial de export');
-      if(ignoreText.includes('presets/')) throw new Error('.cpacker/presets é protegida internamente e não deve estar no .cpignore');
-      if(ignoreText.includes('.cpacker/')) throw new Error('.cpacker não deve depender de regra no .cpignore');
+      let cpackerExists=true;try{await root.getDirectoryHandle('.cpacker');}catch(error){if(error.name==='NotFoundError')cpackerExists=false;else throw error;}
+      if(cpackerExists) throw new Error('a ferramenta não deve criar .cpacker na origem');
       if(document.querySelector('[data-path=".cpacker"]')) throw new Error('.cpacker não deve aparecer no passo 3');
-      if(!document.querySelector('#ext-ignore').value.includes('.png')) throw new Error('configuração .cpacker não foi carregada');
-      if(!document.querySelector('#export-prefix')||!document.querySelector('#new-export-prefix')||!document.querySelector('#export-name-preview')) throw new Error('passo 2 não oferece configuração do nome de export');
+      if(!document.querySelector('#ext-ignore').value.includes('.png')) throw new Error('configuração padrão não foi carregada');
+      const committedRules=document.querySelector('#ignore-rules').value;document.querySelector('#ignore-rules').value=committedRules+'\\n*.md';document.querySelector('#ignore-rules').dispatchEvent(new Event('input'));await ContextPackerBrowser.loadDirectory(root);
+      if(document.querySelector('.tree-file[data-path="README.md"]').dataset.status==='ignored') throw new Error('rascunho não aplicado alterou os filtros ao recarregar a origem');
+      document.querySelector('#ignore-rules').value=committedRules;document.querySelector('#ignore-rules').dispatchEvent(new Event('input'));
+      if(!document.querySelector('#export-prefix')||!document.querySelector('#new-export-prefix')||!document.querySelector('#export-name-preview')) throw new Error('passo 4 não oferece configuração e prévia do nome do arquivo');
+      if(!document.querySelector('#export-settings')||!document.querySelector('#import-settings')||!document.querySelector('#settings-input')) throw new Error('área global não oferece importar e exportar configurações');
       document.querySelector('#new-export-prefix').value='Implementação';document.querySelector('#add-export-prefix').click();
       await wait(()=>document.querySelector('#export-prefix').value==='implementacao');
       await ContextPackerBrowser.loadDirectory(root);
       if(document.querySelector('#export-prefix').value!=='implementacao') throw new Error('último prefixo escolhido não foi restaurado');
       if(!/^implementacao-.+-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4}[.]txt$/.test(document.querySelector('#export-name-preview').textContent)) throw new Error('prévia do nome de export inválida: '+document.querySelector('#export-name-preview').textContent);
-      document.querySelector('#ext-ignore').value='.png, json, zip'; document.querySelector('#ignore-rules').value='*.tmp';
-      document.querySelector('#save-filters').click(); await wait(()=>document.querySelector('#status').textContent.includes('salvas'));
-      const savedConfig=JSON.parse(await (await (await cpacker.getFileHandle('config.json')).getFile()).text());
-      const savedIgnore=await (await (await cpacker.getFileHandle('.cpignore')).getFile()).text();
-      if(savedConfig.ignoredExtensions.join(',')!=='.png,.json,.zip'||savedConfig.exportPrefix!=='implementacao'||!savedConfig.exportPrefixes.includes('implementacao')||savedIgnore!=='*.tmp\\n') throw new Error('botão não salvou filtros e configuração do export');
+      document.querySelector('#ext-ignore').value='.png, json, zip';document.querySelector('#ext-ignore').dispatchEvent(new Event('input'));document.querySelector('#ignore-rules').value='*.tmp';document.querySelector('#ignore-rules').dispatchEvent(new Event('input'));
+      if(document.querySelector('#config-dirty').hidden||document.querySelector('#apply-filters').disabled||!document.querySelector('#export-settings').disabled||!ContextPackerBrowser.hasPendingConfigurationChanges()) throw new Error('alterações não aplicadas não foram sinalizadas');
+      document.querySelector('#apply-filters').click(); await wait(()=>document.querySelector('#status').textContent.includes('aplicadas e salvas'));
+      if(!document.querySelector('#config-dirty').hidden||!document.querySelector('#apply-filters').disabled||document.querySelector('#export-settings').disabled||ContextPackerBrowser.hasPendingConfigurationChanges()) throw new Error('estado pendente não foi limpo após aplicar');
+      const otherRoot=await root.getDirectoryHandle('other-project',{create:true}),otherFile=await otherRoot.getFileHandle('other.txt',{create:true}),otherStream=await otherFile.createWritable();await otherStream.write('outro projeto');await otherStream.close();
+      await ContextPackerBrowser.loadDirectory(otherRoot);
+      if(document.querySelector('#ext-ignore').value.replaceAll(' ','')!=='.png,.json,.zip'||document.querySelector('#ignore-rules').value!=='*.tmp\\n'||document.querySelector('#export-prefix').value!=='implementacao') throw new Error('trocar de pasta alterou a configuração global');
+      await root.removeEntry('other-project',{recursive:true});
+      await ContextPackerBrowser.loadDirectory(root);
+      if(document.querySelector('#ext-ignore').value.replaceAll(' ','')!=='.png,.json,.zip'||document.querySelector('#ignore-rules').value!=='*.tmp\\n'||document.querySelector('#export-prefix').value!=='implementacao') throw new Error('configuração global não foi preservada');
       if(ContextPackerBrowser.selected().length!==0) throw new Error('a seleção inicial deve ser vazia');
       structureToggle.click();
       await wait(()=>document.querySelector('#preview').value==='Selecione pelo menos um arquivo elegível.');
@@ -135,7 +209,7 @@ const zipBase64=buildZip([['snapshot/docs/readme.md','# From ZIP\\n',8],['snapsh
       await wait(()=>document.querySelector('#preview').value.includes('nota manual'));
       if(document.querySelector('#preview').value.includes('.cpacker')) throw new Error('.cpacker não deve aparecer na árvore da prévia');
       document.querySelector('#none').click(); await wait(()=>ContextPackerBrowser.selected().length===0);
-      document.querySelector('#ignore-rules').value+='\\n*.log'; document.querySelector('#apply-filters').click();
+      document.querySelector('#ignore-rules').value+='\\n*.log';document.querySelector('#ignore-rules').dispatchEvent(new Event('input'));document.querySelector('#apply-filters').click();
       await wait(()=>document.querySelector('.tree-file[data-path="logs/debug.log"]').dataset.status==='ignored');
       if(!document.querySelector('.tree-file[data-path="assets/logo.png"] input').disabled) throw new Error('extensão ignorada deve ficar indisponível');
       const initiallyIgnoredLabel=document.querySelector('.tree-file[data-path="bundle.zip"]');
@@ -188,9 +262,12 @@ const zipBase64=buildZip([['snapshot/docs/readme.md','# From ZIP\\n',8],['snapsh
       document.querySelector('#preset-name').value='Example bundle'; document.querySelector('#preset-name').dispatchEvent(new Event('input'));
       document.querySelector('#save-preset').click();
       await wait(()=>document.querySelector('#saved-presets').value==='example-bundle.json');
-      const presetFile=await (await (await cpacker.getDirectoryHandle('presets')).getFileHandle('example-bundle.json')).getFile();
-      const presetJson=JSON.parse(await presetFile.text());
+      const presetJson=JSON.parse(ContextPackerBrowser.exportConfiguration()).presets['example-bundle.json'];
       if(presetJson.files.length!==5||presetJson.files.some(item=>typeof item.path!=='string')) throw new Error('preset JSON inválido');
+      const originalIdbPut=IDBObjectStore.prototype.put;let failNextPresetWrite=true;IDBObjectStore.prototype.put=function(...args){if(failNextPresetWrite){failNextPresetWrite=false;throw new Error('falha simulada');}return originalIdbPut.apply(this,args);};document.querySelector('#preset-name').value='Should fail';document.querySelector('#preset-name').dispatchEvent(new Event('input'));document.querySelector('#save-preset').click();await wait(()=>!document.querySelector('#toast').hidden&&document.querySelector('#toast').dataset.kind==='error');IDBObjectStore.prototype.put=originalIdbPut;
+      if(JSON.parse(ContextPackerBrowser.exportConfiguration()).presets['should-fail.json']) throw new Error('preset com gravação falha permaneceu na configuração em memória');
+      saved='';suggestedName='';document.querySelector('#export-settings').click();await wait(()=>suggestedName==='context-packer-config.json'&&saved.includes('example-bundle.json'));
+      const exportedConfig=JSON.parse(saved);if(exportedConfig.settings.ignoreRules!=='*.tmp\\n*.log\\n'||exportedConfig.settings.exportPrefix!=='implementacao'||!exportedConfig.presets['example-bundle.json']) throw new Error('exportação não contém todas as configurações salvas: '+JSON.stringify(exportedConfig));
       document.querySelector('#none').click(); await wait(()=>ContextPackerBrowser.selected().length===0);
       document.querySelector('#load-saved-preset').click(); await wait(()=>ContextPackerBrowser.selected().length===5);
       await wait(()=>document.querySelector('#toast-message').textContent==='Preset example-bundle.json aplicado: todos os 5 itens foram marcados.');
@@ -198,21 +275,32 @@ const zipBase64=buildZip([['snapshot/docs/readme.md','# From ZIP\\n',8],['snapsh
       copied=''; document.querySelector('#copy').click(); await wait(()=>copied.includes('WBCTX:')&&copied.includes(':COMPLETE'));
       if(copied!==document.querySelector('#preview').value) throw new Error('Copiar não enviou a prévia completa');
       document.querySelector('#generate').click(); await wait(()=>saved.includes('WBCTX:') && saved.includes(':COMPLETE'));
-      if(suggestedName!==document.querySelector('#export-name-preview').textContent||!suggestedName.startsWith('implementacao-')) throw new Error('Salvar TXT não usou o prefixo selecionado');
+      if(suggestedName!==document.querySelector('#export-name-preview').textContent||!suggestedName.startsWith('implementacao-')) throw new Error('Baixar não usou o prefixo selecionado');
       const folderResult={discovered:document.querySelectorAll('.tree-file').length,selected:ContextPackerBrowser.selected().length,ignored:document.querySelectorAll('.tree-file[data-status="ignored"]').length,presetFiles:presetJson.files.length,savedBytes:new TextEncoder().encode(saved).byteLength,hasSpec:saved.includes('docs/requirements.md'),hasStructure:saved.includes('STRUCTURE')&&saved.includes('[-] logo.png')};
       document.querySelector('#remove-export-prefix').click();await wait(()=>document.querySelector('#export-prefix').value==='');
       await ContextPackerBrowser.loadDirectory(root);
       if(document.querySelector('#export-prefix').value!==''||[...document.querySelector('#export-prefix').options].some(option=>option.value==='implementacao')) throw new Error('prefixo removido não foi persistido');
       if(document.querySelector('#export-name-preview').textContent.startsWith('implementacao-')) throw new Error('opção sem prefixo não atualizou o nome do export');
+      window.confirm=()=>true;document.querySelector('#restore-prefixes').click();await wait(()=>document.querySelector('#export-prefix').value==='contexto');
+      if(document.querySelector('#ignore-rules').value!=='*.tmp\\n*.log\\n'||![...document.querySelector('#saved-presets').options].some(option=>option.value==='example-bundle.json')) throw new Error('restaurar prefixos alterou filtros ou presets');
+      document.querySelector('#restore-filters').click();await wait(()=>document.querySelector('#ext-ignore').value.includes('.jpeg')&&!document.querySelector('#ignore-rules').value.includes('*.tmp'));
+      if(document.querySelector('#export-prefix').value!=='contexto'||![...document.querySelector('#saved-presets').options].some(option=>option.value==='example-bundle.json')) throw new Error('restaurar filtros alterou prefixos ou presets');
+      document.querySelector('#clear-saved-presets').click();await wait(()=>document.querySelector('#saved-presets').disabled);
+      if(document.querySelector('#export-prefix').value!=='contexto'||!document.querySelector('#ext-ignore').value.includes('.jpeg')) throw new Error('remover presets alterou filtros ou prefixos');
+      await ContextPackerBrowser.importConfiguration(JSON.stringify(exportedConfig));
+      if(document.querySelector('#export-prefix').value!=='implementacao'||document.querySelector('#ignore-rules').value!==exportedConfig.settings.ignoreRules||![...document.querySelector('#saved-presets').options].some(option=>option.value==='example-bundle.json')) throw new Error('carregamento JSON não restaurou todas as configurações');
+      const oversizedConfig=new File(['x'.repeat(5*1024*1024+1)],'oversized-config.json',{type:'application/json'}),settingsInput=document.querySelector('#settings-input');Object.defineProperty(settingsInput,'files',{configurable:true,value:[oversizedConfig]});settingsInput.dispatchEvent(new Event('change'));await wait(()=>document.querySelector('#status').dataset.kind==='error');
+      if(!document.querySelector('#status').textContent.includes('5 MB')) throw new Error('arquivo de configuração acima do limite foi lido ou não informou o limite');
 
       document.querySelector('#status').textContent='aguardando pasta arrastada';const directoryDrop=new Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(directoryDrop,'dataTransfer',{value:{items:[{kind:'file',getAsFileSystemHandle:async()=>root}]}});document.querySelector('#source-drop').dispatchEvent(directoryDrop);
-      await wait(()=>document.querySelector('#status').textContent.includes('Configuração .cpacker carregada'));
+      await wait(()=>document.querySelector('#status').textContent.includes('configurações globais foram mantidas'));
 
       const zipBytes=Uint8Array.from(atob('${zipBase64}'),character=>character.charCodeAt(0)),zipFile=new File([zipBytes],'snapshot-origin.zip',{type:'application/zip'}),transfer=new DataTransfer();transfer.items.add(zipFile);
       document.querySelector('#source-drop').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:transfer}));
       await wait(()=>document.querySelectorAll('.tree-file').length===2&&document.querySelector('#folder').textContent.includes('snapshot-origin.zip'));
+      if(!refreshSource.hidden||getComputedStyle(refreshSource).display!=='none'||!refreshSource.disabled) throw new Error('atualização da pasta não deve aparecer para ZIP');
       if(document.querySelector('[data-path^=".cpacker"]')) throw new Error('.cpacker do ZIP não deve aparecer');
-      if(!document.querySelector('#save-filters').disabled||!document.querySelector('#save-preset').disabled) throw new Error('ZIP deve permanecer somente leitura');
+      if(document.querySelector('#export-prefix').value!=='implementacao'||document.querySelector('#ignore-rules').value!==exportedConfig.settings.ignoreRules||![...document.querySelector('#saved-presets').options].some(option=>option.value==='example-bundle.json')) throw new Error('abrir ZIP alterou a configuração global');
       const baseFolder=document.querySelector('#base-folder');
       if(baseFolder.disabled||![...baseFolder.options].some(option=>option.value==='snapshot')) throw new Error('subdiretório do ZIP não foi oferecido como pasta base');
       baseFolder.value='snapshot';baseFolder.dispatchEvent(new Event('change'));
@@ -249,18 +337,38 @@ const zipBase64=buildZip([['snapshot/docs/readme.md','# From ZIP\\n',8],['snapsh
     assert.ok(result.savedBytes > 500);
     console.log(JSON.stringify(result, null, 2));
 
-    await evaluate(`document.querySelector('#preset-menu').open=true`);
+    await evaluate(`document.querySelector('#preset-menu').open=true;document.querySelector('#prefix-settings').open=true`);
     for (const [label, width, height] of [['desktop', 1280, 950], ['mobile', 390, 844]]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
       assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false, label + ' não deve transbordar');
       assert.equal(await evaluate(`getComputedStyle(document.querySelector('.preset-grid')).gridTemplateColumns.split(' ').length`), label==='desktop'?2:1, label+' deve organizar carregar/salvar nas colunas esperadas');
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('.file-actions')).gridTemplateColumns.split(' ').length`), label==='desktop'?2:1, label+' deve organizar nome e ações do arquivo nas colunas esperadas');
       if(label==='desktop') {
         assert.equal(await evaluate(`Math.abs(document.querySelector('#saved-presets').offsetTop-document.querySelector('#load-saved-preset').offsetTop)<=2`), true, 'dropdown e Carregar devem ficar na mesma linha');
         assert.equal(await evaluate(`Math.abs(document.querySelector('#preset-name').offsetTop-document.querySelector('#save-preset').offsetTop)<=2`), true, 'nome e Salvar devem ficar na mesma linha');
+        assert.equal(await evaluate(`Math.abs(document.querySelector('#export-prefix').offsetTop-document.querySelector('#remove-export-prefix').offsetTop)<=2`), true, 'prefixo ativo e Remover devem ficar alinhados');
+        assert.equal(await evaluate(`Math.abs(document.querySelector('#new-export-prefix').offsetTop-document.querySelector('#add-export-prefix').offsetTop)<=2`), true, 'novo prefixo e Adicionar devem ficar alinhados');
       }
       const shot = await send('Page.captureScreenshot', { format:'png', captureBeyondViewport:true });
       await fs.writeFile(`/tmp/context-packer-${label}.png`, Buffer.from(shot.data, 'base64'));
     }
+    await send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+    await send('Page.reload');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    for (let i = 0; i < 100; i++) { if (await evaluate(`document.readyState==='complete' && typeof ContextPackerBrowser==='object'`)) break; await new Promise(resolve => setTimeout(resolve, 25)); }
+    await evaluate(`ContextPackerBrowser.configurationReady()`);
+    assert.equal(await evaluate(`document.querySelector('#ext-ignore').value.replaceAll(' ','')==='.png,.json,.zip'&&document.querySelector('#ignore-rules').value==='*.tmp\\n*.log\\n'&&document.querySelector('#export-prefix').value==='implementacao'&&[...document.querySelector('#saved-presets').options].some(option=>option.value==='example-bundle.json')`), true, 'configuração global deve voltar do banco nativo após recarregar o app');
+    assert.equal(await evaluate(`(async()=>{const originalPut=IDBObjectStore.prototype.put;let calls=0;IDBObjectStore.prototype.put=function(...args){calls++;if(calls===1)throw new Error('primeira gravação falhou');return originalPut.apply(this,args);};try{const input=document.querySelector('#new-export-prefix'),button=document.querySelector('#add-export-prefix');input.value='race-a';button.click();input.value='race-b';button.click();for(let elapsed=0;elapsed<5000;elapsed+=25){if(calls>=2&&document.querySelector('#status').textContent==='Configurações salvas.')break;await new Promise(resolve=>setTimeout(resolve,25));}const exported=JSON.parse(ContextPackerBrowser.exportConfiguration());return document.querySelector('#export-prefix').value==='race-b'&&exported.settings.exportPrefix==='race-b'&&exported.settings.exportPrefixes.includes('race-b');}finally{IDBObjectStore.prototype.put=originalPut;}})()`), true, 'uma falha seguida por outra alteração deve manter a configuração mais recente consistente');
+    assert.equal(await evaluate(`(async()=>{const open=()=>new Promise((resolve,reject)=>{const request=indexedDB.open('context-packer',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);}),db=await open();await new Promise((resolve,reject)=>{const transaction=db.transaction('source-configurations','readwrite'),store=transaction.objectStore('source-configurations'),request=store.get('global');request.onsuccess=()=>{const profile=request.result;profile.configuration.presets['external-tab.json']={name:'External tab',files:[{path:'external.txt',annotation:''}]};store.put(profile);};transaction.oncomplete=resolve;transaction.onerror=transaction.onabort=()=>reject(transaction.error);});db.close();const input=document.querySelector('#new-export-prefix');input.value='merge-check';document.querySelector('#add-export-prefix').click();for(let elapsed=0;elapsed<5000;elapsed+=25){if(document.querySelector('#export-prefix').value==='merge-check'&&document.querySelector('#status').textContent==='Configurações salvas.')break;await new Promise(resolve=>setTimeout(resolve,25));}const verifyDb=await open(),stored=await new Promise((resolve,reject)=>{const request=verifyDb.transaction('source-configurations').objectStore('source-configurations').get('global');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});verifyDb.close();return !!stored.configuration.presets['external-tab.json']&&!!JSON.parse(ContextPackerBrowser.exportConfiguration()).presets['external-tab.json'];})()`), true, 'uma alteração local deve preservar campos gravados por outra aba');
+    assert.equal(await evaluate(`(async()=>{window.confirm=()=>true;const files=Array.from({length:2000},(_,index)=>({path:'src/file-'+String(index).padStart(4,'0')+'.js',annotation:'x'.repeat(40)})),presets=Object.fromEntries(Array.from({length:12},(_,index)=>['large-'+index+'.json',{name:'Large '+index,files}])),text=JSON.stringify({formatVersion:'1.0',settings:{ignoredExtensions:['.png'],ignoreRules:'*.log\\n',exportPrefixes:['contexto'],exportPrefix:'contexto'},presets});if(new Blob([text]).size<=1024*1024)throw new Error('fixture grande demais não foi criada');const input=document.querySelector('#settings-input');Object.defineProperty(input,'files',{configurable:true,value:[new File([text],'large-config.json',{type:'application/json'})]});input.dispatchEvent(new Event('change'));for(let elapsed=0;elapsed<10000;elapsed+=25){if(document.querySelector('#status').textContent.includes('carregados e salvos'))return [...document.querySelector('#saved-presets').options].some(option=>option.value==='large-11.json');if(document.querySelector('#status').dataset.kind==='error')return false;await new Promise(resolve=>setTimeout(resolve,25));}return false;})()`), true, 'um arquivo exportável acima de 1 MiB deve poder ser carregado pela interface');
+    await send('Page.addScriptToEvaluateOnNewDocument',{source:`Object.defineProperty(globalThis,'indexedDB',{configurable:true,value:undefined});`});
+    await send('Page.reload');
+    for (let i = 0; i < 100; i++) { if (await evaluate(`document.readyState==='complete' && typeof ContextPackerBrowser==='object'`)) break; await new Promise(resolve => setTimeout(resolve, 25)); }
+    assert.equal(await evaluate(`ContextPackerBrowser.configurationReady().then(()=>true,()=>false)`), true, 'falha do IndexedDB deve usar configuração temporária em memória');
+    assert.equal(await evaluate(`!document.querySelector('#ext-ignore').disabled&&!document.querySelector('#choose-zip').disabled`), true, 'falha do IndexedDB não deve bloquear o aplicativo');
+    assert.equal(await evaluate(`(async()=>{const bytes=Uint8Array.from(atob('${zipBase64}'),character=>character.charCodeAt(0));await ContextPackerBrowser.loadZipFile(new File([bytes],'fallback.zip',{type:'application/zip'}));return document.querySelectorAll('.tree-file').length===2;})()`), true, 'ZIP deve continuar utilizável sem IndexedDB');
+    assert.equal(await evaluate(`(async()=>{const input=document.querySelector('#new-export-prefix');input.value='sessao';document.querySelector('#add-export-prefix').click();for(let elapsed=0;elapsed<3000;elapsed+=25){if(document.querySelector('#export-prefix').value==='sessao')break;await new Promise(resolve=>setTimeout(resolve,25));}const message=document.querySelector('#status').textContent;return message.includes('somente nesta sessão')&&!/salv[ao]/i.test(message);})()`), true, 'fallback sem IndexedDB não deve alegar persistência');
+
   } finally {
     await send('Page.close').catch(() => {}); ws.close();
     if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
